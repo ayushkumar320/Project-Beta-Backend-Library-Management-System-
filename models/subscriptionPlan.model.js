@@ -19,7 +19,7 @@ const SubscriptionPlanSchema = new mongoose.Schema({
   },
   status: {
     type: Boolean,
-    default: Inactive,
+    default: false,
   },
 });
 

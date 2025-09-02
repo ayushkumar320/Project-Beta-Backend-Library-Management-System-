@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import Admin from "../models/admin.model";
+import Admin from "../models/admin.model.js";
 import User from "../models/user.model.js";
 import SubscriptionPlan from "../models/subscriptionPlan.model.js";
 import dotenv from "dotenv";
@@ -109,56 +109,59 @@ export async function updateStudent(req, res) {
     isActive,
   } = req.body;
 
-  try {
-    const existingUser = await User.findOne({adharNumber});
-    if (!existingUser) {
-      return res.status(404).json({message: "User not found"});
-    }
+ try {
+  const updatedUser = await User.findOneAndUpdate(
+    { adharNumber },
+    {
+      name,
+      subscriptionPlan,
+      joiningDate,
+      feePaid,
+      seatNumber,
+      age,
+      address,
+      idNumber,
+      isActive,
+    },
+    { new: true }
+  );
 
-    existingUser.name = name;
-    existingUser.subscriptionPlan = subscriptionPlan;
-    existingUser.joiningDate = joiningDate;
-    existingUser.feePaid = feePaid;
-    existingUser.seatNumber = seatNumber;
-    existingUser.age = age;
-    existingUser.address = address;
-    existingUser.idNumber = idNumber;
-    existingUser.isActive = isActive;
-
-    await existingUser.save();
-    res.json({
-      name: existingUser.name,
-      message: "User updated successfully",
-    });
-  } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({message: "Internal server error"});
+  if (!updatedUser) {
+    return res.status(404).json({ message: "User not found" });
   }
+
+  res.json({
+    name: updatedUser.name,
+    message: "User updated successfully",
+  });
+} catch (error) {
+  console.error("Error updating user:", error);
+  res.status(500).json({ message: "Internal server error" });
+}
 }
 
 export async function updateSubscriptionPlan(req, res) {
   const {planName, price, duration, subscribers, status} = req.body;
 
-  try {
-    const existingPlan = await SubscriptionPlan.findOne({planName});
-    if (!existingPlan) {
-      return res.status(404).json({message: "Subscription plan not found"});
-    }
+try {
+  const updatedPlan = await SubscriptionPlan.findOneAndUpdate(
+    { planName },
+    { price, duration, subscribers, status },
+    { new: true }
+  );
 
-    existingPlan.price = price;
-    existingPlan.duration = duration;
-    existingPlan.subscribers = subscribers;
-    existingPlan.status = status;
-
-    await existingPlan.save();
-    res.json({
-      message: "Subscription plan updated successfully",
-      planName: existingPlan.planName,
-    });
-  } catch (error) {
-    console.error("Error updating subscription plan:", error);
-    res.status(500).json({message: "Internal server error"});
+  if (!updatedPlan) {
+    return res.status(404).json({ message: "Subscription plan not found" });
   }
+
+  res.json({
+    message: "Subscription plan updated successfully",
+    planName: updatedPlan.planName,
+  });
+} catch (error) {
+  console.error("Error updating subscription plan:", error);
+  res.status(500).json({ message: "Internal server error" });
+}
 }
 
 // GET Controllers
