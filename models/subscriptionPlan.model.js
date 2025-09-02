@@ -23,8 +23,8 @@ const SubscriptionPlanSchema = new mongoose.Schema({
   },
 });
 
-const subscriptionPlan = mongoose.model(
+const SubscriptionPlan = mongoose.model(
   "subscriptionPlan",
   SubscriptionPlanSchema
 );
-module.exports = subscriptionPlan;
+export default SubscriptionPlan;
