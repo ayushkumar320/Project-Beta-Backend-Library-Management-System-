@@ -3,6 +3,12 @@ import SeatManegment from "../models/seatManegment.model.js";
 export async function SeatManegment(req, res) {
     try {
         const {seatNumber, student, plan, allocationDate, expirationDate, status} = req.body;
+        const existingSeatManegment = await SeatManegment.findOne({seatNumber});
+        if(existingSeatManegment){
+            return res.status(400).json({
+                message: "SeatManegment already exists"
+            })          
+        }
         const newSeatManegment = new SeatManegment({
             seatNumber,
             student,
