@@ -1,33 +1,66 @@
-import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import SubscriptionPlan from "../models/subscriptionPlan.model.js";
 
-
 export async function addSeat(req, res) {
   try {
-    const {seatNumber, student, plan, allocationDate, expirationDate, status} =
-      req.body;
-    const existingSeatManegment = await SeatManegment.findOne({seatNumber});
-    if (existingSeatManegment) {
+    const {
+      seatNumber,
+      studentName,
+      planName,
+      adharNumber,
+      age,
+      address,
+      idNumber,
+    } = req.body;
+
+    // Check if seat number is already taken
+    const existingSeat = await User.findOne({seatNumber});
+    if (existingSeat) {
       return res.status(400).json({
-        message: "SeatManegment already exists",
+        message: "Seat number already exists",
       });
     }
-    const newSeatManegment = new SeatManegment({
+
+    // Check if Adhar number already exists
+    const existingUser = await User.findOne({adharNumber});
+    if (existingUser) {
+      return res.status(400).json({
+        message: "User with this Adhar number already exists",
+      });
+    }
+
+    // Find subscription plan
+    const subscriptionPlan = await SubscriptionPlan.findOne({planName});
+    if (!subscriptionPlan) {
+      return res.status(404).json({
+        message: "Subscription plan not found",
+      });
+    }
+
+    // Create new user with seat assignment
+    const newUser = new User({
+      name: studentName,
+      adharNumber,
+      subscriptionPlan: subscriptionPlan._id,
+      joiningDate: new Date(),
+      feePaid: false,
       seatNumber,
-      student,
-      plan,
-      allocationDate,
-      expirationDate,
-      status,
+      age,
+      address,
+      idNumber,
+      isActive: true,
     });
-    await newSeatManegment.save();
+
+    await newUser.save();
+
     res.json({
-      message: "New SeatManegment added!",
+      message: "Seat allocated successfully!",
       seatNumber: seatNumber,
+      student: studentName,
+      plan: planName,
     });
   } catch (error) {
-    console.log("Error creating in SeatManegment");
+    console.error("Error allocating seat:", error);
     res.status(500).json({
       message: "Internal server error",
     });
@@ -36,26 +69,48 @@ export async function addSeat(req, res) {
 
 export async function updateSeat(req, res) {
   try {
-    const {seatNumber, student, plan, allocationDate, expirationDate, status} =
-      req.body;
-    const existingSeatManegment = await SeatManegment.findOne({seatNumber});
-    if (existingSeatManegment) {
-      const modifiedSeatManegment = {
-        seatNumber,
-        student,
-        plan,
-        allocationDate,
-        expirationDate,
-        status,
-      };
-      await existingSeatManegment.updateOne(modifiedSeatManegment);
-      res.json({
-        message: "SeatManegment updated!",
-        seatNumber: seatNumber,
+    const seatNumber = req.params.seatNumber;
+    const {studentName, planName, isActive, feePaid} = req.body;
+
+    const existingUser = await User.findOne({seatNumber});
+    if (!existingUser) {
+      return res.status(404).json({
+        message: "Seat not found",
       });
     }
+
+    if (studentName && planName) {
+      // If assigning a new student to the seat
+      const subscriptionPlan = await SubscriptionPlan.findOne({planName});
+      if (!subscriptionPlan) {
+        return res.status(404).json({
+          message: "Subscription plan not found",
+        });
+      }
+
+      // Update the user's information
+      existingUser.name = studentName;
+      existingUser.subscriptionPlan = subscriptionPlan._id;
+      existingUser.isActive = isActive !== undefined ? isActive : true;
+      existingUser.feePaid = feePaid !== undefined ? feePaid : false;
+      existingUser.joiningDate = new Date();
+    } else {
+      // Just update seat status (e.g., make available)
+      existingUser.isActive = isActive !== undefined ? isActive : false;
+      existingUser.feePaid =
+        feePaid !== undefined ? feePaid : existingUser.feePaid;
+    }
+
+    await existingUser.save();
+
+    res.json({
+      message: "Seat updated successfully!",
+      seatNumber: seatNumber,
+      student: existingUser.name,
+      status: existingUser.isActive ? "Occupied" : "Available",
+    });
   } catch (error) {
-    console.log("Error editting in SeatManegment");
+    console.error("Error updating seat:", error);
     res.status(500).json({
       message: "Internal server error",
     });
