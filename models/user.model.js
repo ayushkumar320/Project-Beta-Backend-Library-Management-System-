@@ -26,6 +26,7 @@ const UserSchema = new mongoose.Schema({
   seatNumber: {
     type: String,
     required: true,
+    unique: true,
   },
   age: {
     type: Number,
@@ -36,6 +37,7 @@ const UserSchema = new mongoose.Schema({
   idNumber: {
     type: Number,
     required: true,
+    unique: true,
   },
   isActive: {
     type: Boolean,
