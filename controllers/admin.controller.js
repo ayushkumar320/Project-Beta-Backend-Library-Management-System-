@@ -86,6 +86,32 @@ export async function createSubscriptionPlan(req, res) {
   }
 };
 
-export async function seatManagement(req, res) {
-  
+export async function updateStudent(req, res) {
+  const {name, adharNumber, subscriptionPlan, joiningDate, feePaid, seatNumber, age, address, idNumber, isActive} = req.body;
+
+  try {
+    const existingUser = await User.findOne({adharNumber});
+    if (!existingUser) {
+      return res.status(404).json({message: "User not found"});
+    }
+
+    existingUser.name = name;
+    existingUser.subscriptionPlan = subscriptionPlan;
+    existingUser.joiningDate = joiningDate;
+    existingUser.feePaid = feePaid;
+    existingUser.seatNumber = seatNumber;
+    existingUser.age = age;
+    existingUser.address = address;
+    existingUser.idNumber = idNumber;
+    existingUser.isActive = isActive;
+
+    await existingUser.save();
+    res.json({
+      name: existingUser.name,
+      message: "User updated successfully"
+    });
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({message: "Internal server error"});
+  }
 }
