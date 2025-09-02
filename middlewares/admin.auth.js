@@ -3,7 +3,7 @@ import Admin from '../models/admin.model.js';
 
 const adminAuth = async (req, res, next) => {
     try {
-        const token = req.header('Authorization').replace('Bearer ', '');
+        const token = req.header('Authorization').split(" ")[1];
         if (!token) {
             return res.status(401).json({ message: 'Authentication token is missing' });
         }

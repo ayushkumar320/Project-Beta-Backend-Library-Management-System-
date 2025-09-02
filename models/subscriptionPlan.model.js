@@ -1,4 +1,3 @@
-import connectDB from "../db/connectDB";
 import mongoose from "mongoose";
 
 const SubscriptionPlanSchema = new mongoose.Schema({
@@ -18,7 +17,7 @@ const SubscriptionPlanSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  Status: {
+  status: {
     type: Boolean,
     default: Inactive,
   },

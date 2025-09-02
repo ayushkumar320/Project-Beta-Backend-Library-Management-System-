@@ -1,6 +1,4 @@
-import connectDB from "../db/connectDB";
 import mongoose from "mongoose";
-import SubscriptionPlan from "./subscriptionPlan.model";
 
 const UserSchema = new mongoose.Schema({
   name: {
@@ -22,12 +20,11 @@ const UserSchema = new mongoose.Schema({
     default: Date.now,
   },
   feePaid: {
-    type: Number,
-    required: true,
+    type: Boolean,
     default: false,
   },
   seatNumber: {
-    type: Number,
+    type: String,
     required: true,
   },
   age: {
