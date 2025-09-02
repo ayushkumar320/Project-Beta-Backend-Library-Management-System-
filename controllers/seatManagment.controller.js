@@ -30,3 +30,32 @@ export async function SeatManegment(req, res) {
       message: "Internal server error"
     })
 }}
+
+export async function getSeatManegment(req, res) {
+    try {
+         const {seatNumber, student, plan, allocationDate, expirationDate, status} = req.body;
+        const existingSeatManegment = await SeatManegment.findOne({seatNumber});
+        if(existingSeatManegment){
+            const modifiedSeatManegment = {
+                seatNumber,
+                student,
+                plan,
+                allocationDate,
+                expirationDate,
+                status
+            }
+            await existingSeatManegment.updateOne(modifiedSeatManegment);
+            res.json({
+                message: "SeatManegment updated!",
+                seatNumber: seatNumber
+            });
+            
+        }
+    }
+    catch(error){
+        console.log("Error editting in SeatManegment");
+        res.status(500).json({
+          message: "Internal server error"
+        })
+    }
+}
