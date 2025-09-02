@@ -29,4 +29,6 @@ const SeatManegmentSchema = new mongoose.Schema({
     },
 });
 
-export default mongoose.model("SeatManegment", SeatManegmentSchema);
+const SeatManegment = mongoose.model("SeatManegment", SeatManegmentSchema);
+
+export default SeatManegment;
