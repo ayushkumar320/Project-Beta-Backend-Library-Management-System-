@@ -4,6 +4,7 @@ const SeatManegmentSchema = new mongoose.Schema({
     seatNumber: {
         type: String,
         required: true,
+        unique: true,
     },
     student:{
         type: mongoose.Schema.Types.ObjectId,
