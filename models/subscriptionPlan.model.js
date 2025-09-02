@@ -1,3 +1,7 @@
+import connectDB from "../db/connectDB"
+import mongoose from "mongoose"
+
+connectDB()
 
 
 const SubscriptionPlanSchema = new mongoose.Schema({

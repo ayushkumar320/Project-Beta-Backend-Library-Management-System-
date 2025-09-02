@@ -1,3 +1,6 @@
+
+import connectDB from "../db/connectDB"
+import mongoose from "mongoose"
 const subscriptionPlan = require("./subscriptionPlan.model");
 
 
