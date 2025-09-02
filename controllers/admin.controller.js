@@ -115,3 +115,28 @@ export async function updateStudent(req, res) {
     res.status(500).json({message: "Internal server error"});
   }
 }
+
+export async function updateSubscriptionPlan(req, res) {
+  const {planName, price, duration, subscribers, status} = req.body;
+
+  try {
+    const existingPlan = await SubscriptionPlan.findOne({planName});
+    if (!existingPlan) {
+      return res.status(404).json({message: "Subscription plan not found"});
+    }
+
+    existingPlan.price = price;
+    existingPlan.duration = duration;
+    existingPlan.subscribers = subscribers;
+    existingPlan.status = status;
+
+    await existingPlan.save();
+    res.json({
+      message: "Subscription plan updated successfully",
+      planName: existingPlan.planName
+    });
+  } catch (error) {
+    console.error("Error updating subscription plan:", error);
+    res.status(500).json({message: "Internal server error"});
+  }
+}
