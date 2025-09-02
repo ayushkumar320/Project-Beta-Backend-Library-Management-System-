@@ -85,3 +85,7 @@ export async function createSubscriptionPlan(req, res) {
     });
   }
 };
+
+export async function seatManagement(req, res) {
+  
+}
