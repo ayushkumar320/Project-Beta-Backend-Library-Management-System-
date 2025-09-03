@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import Admin from "../models/admin.model";
+import Admin from "../models/admin.model.js";
 import User from "../models/user.model.js";
 import SubscriptionPlan from "../models/subscriptionPlan.model.js";
 import dotenv from "dotenv";
