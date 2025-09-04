@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import Admin from "../models/admin.model.js";
 import User from "../models/user.model.js";
 import SubscriptionPlan from "../models/subscriptionPlan.model.js";
+import connectDB from "../db/connectDB.js";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -11,6 +12,14 @@ export async function adminLogin(req, res) {
   const {email, password} = req.body;
 
   try {
+    // Ensure database connection
+    await connectDB();
+
+    // Input validation
+    if (!email || !password) {
+      return res.status(400).json({message: "Email and password are required"});
+    }
+
     const admin = await Admin.findOne({email});
     if (!admin) {
       return res.status(404).json({message: "Admin not found"});
@@ -18,11 +27,20 @@ export async function adminLogin(req, res) {
     if (admin.password !== password) {
       return res.status(401).json({message: "Invalid credentials"});
     }
+
+    // Check if JWT_SECRET exists
+    if (!secret) {
+      console.error("JWT_SECRET is not defined");
+      return res.status(500).json({message: "Server configuration error"});
+    }
+
     const token = jwt.sign({_id: admin._id}, secret);
     res.json({token});
   } catch (error) {
     console.error("Error logging in admin:", error);
-    res.status(500).json({message: "Internal server error"});
+    res
+      .status(500)
+      .json({message: "Internal server error", error: error.message});
   }
 }
 
@@ -157,7 +175,10 @@ export async function updateStudent(req, res) {
     }
 
     // Update subscription plan if it has changed
-    if (subscriptionPlan && subscriptionPlan.toString() !== oldSubscriptionPlan.toString()) {
+    if (
+      subscriptionPlan &&
+      subscriptionPlan.toString() !== oldSubscriptionPlan.toString()
+    ) {
       // Remove user from old subscription plan
       if (oldSubscriptionPlan) {
         await SubscriptionPlan.findByIdAndUpdate(
@@ -185,7 +206,6 @@ export async function updateStudent(req, res) {
     res.status(500).json({message: "Internal server error"});
   }
 }
-
 
 export async function updateSubscriptionPlan(req, res) {
   const {planName, price, duration, subscribers, status} = req.body;
