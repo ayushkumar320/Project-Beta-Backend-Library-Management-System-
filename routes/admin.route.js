@@ -23,17 +23,6 @@ import {
 
 const router = express.Router();
 
-// Test endpoint for debugging
-router.get("/test", (req, res) => {
-  res.json({
-    message: "API is working",
-    environment: process.env.NODE_ENV,
-    hasJwtSecret: !!process.env.JWT_SECRET,
-    hasMongoUri: !!process.env.MONGODB_URI,
-    timestamp: new Date().toISOString()
-  });
-});
-
 router.post("/login", adminLogin);
 router.post("/register", adminAuth, registerUser);
 router.post("/subscription", adminAuth, createSubscriptionPlan);
