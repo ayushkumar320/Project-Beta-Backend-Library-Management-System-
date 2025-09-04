@@ -7,6 +7,8 @@ import connectDB from "./db/connectDB.js";
 // Configure environment variables
 dotenv.config();
 
+connectDB();
+
 const app = express();
 
 // Middleware
@@ -25,7 +27,6 @@ app.get("/health", (req, res) => {
 });
 
 // Initialize database connection
-connectDB().catch(console.error);
 
 // For local development only
 const PORT = process.env.PORT || 3000;
