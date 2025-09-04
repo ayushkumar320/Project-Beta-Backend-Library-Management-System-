@@ -10,6 +10,7 @@ const UserSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  // change the schema to get direct subscription Plan
   subscriptionPlan: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "SubscriptionPlan",
