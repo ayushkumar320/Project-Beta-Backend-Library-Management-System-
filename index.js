@@ -4,28 +4,36 @@ import dotenv from "dotenv";
 import router from "./routes/admin.route.js";
 import connectDB from "./db/connectDB.js";
 
-const app = express();
-
+// Configure environment variables
 dotenv.config();
 
-// Connect to MongoDB
-connectDB();
+const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
+
+// Routes
 app.use("/api/admin", router);
 
 app.get("/", (req, res) => {
-  res.send("Server is healthy!");
+  res.json({message: "Server is healthy!"});
 });
 
-// For local development
+app.get("/health", (req, res) => {
+  res.json({status: "OK", timestamp: new Date().toISOString()});
+});
+
+// Initialize database connection
+connectDB().catch(console.error);
+
+// For local development only
+const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== "production") {
-  const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
 }
 
-// Export for Vercel
+// Export for serverless
 export default app;
