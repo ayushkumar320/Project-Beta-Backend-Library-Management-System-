@@ -57,6 +57,16 @@ export async function registerUser(req, res) {
       isActive,
     });
     await user.save();
+
+    // Add user to the subscription plan's subscribers list
+    if (subscriptionPlan) {
+      await SubscriptionPlan.findByIdAndUpdate(
+        subscriptionPlan,
+        {$push: {subscribers: user._id}},
+        {new: true}
+      );
+    }
+
     res.status(201).json({message: "User registered successfully"});
   } catch (error) {
     console.error("Error registering user:", error);
@@ -118,6 +128,14 @@ export async function updateStudent(req, res) {
   }
 
   try {
+    const user = await User.findOne({adharNumber: adharNumberAsNumber});
+
+    if (!user) {
+      return res.status(404).json({message: "User not found"});
+    }
+
+    const oldSubscriptionPlan = user.subscriptionPlan;
+
     const updatedUser = await User.findOneAndUpdate(
       {adharNumber: adharNumberAsNumber},
       {
@@ -138,6 +156,25 @@ export async function updateStudent(req, res) {
       return res.status(404).json({message: "User not found"});
     }
 
+    // Update subscription plan if it has changed
+    if (subscriptionPlan && subscriptionPlan.toString() !== oldSubscriptionPlan.toString()) {
+      // Remove user from old subscription plan
+      if (oldSubscriptionPlan) {
+        await SubscriptionPlan.findByIdAndUpdate(
+          oldSubscriptionPlan,
+          {$pull: {subscribers: user._id}},
+          {new: true}
+        );
+      }
+
+      // Add user to new subscription plan
+      await SubscriptionPlan.findByIdAndUpdate(
+        subscriptionPlan,
+        {$push: {subscribers: user._id}},
+        {new: true}
+      );
+    }
+
     res.json({
       name: updatedUser.name,
       adharNumber: updatedUser.adharNumber,
@@ -148,6 +185,7 @@ export async function updateStudent(req, res) {
     res.status(500).json({message: "Internal server error"});
   }
 }
+
 
 export async function updateSubscriptionPlan(req, res) {
   const {planName, price, duration, subscribers, status} = req.body;

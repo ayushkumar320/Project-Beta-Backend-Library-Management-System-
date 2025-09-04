@@ -80,7 +80,7 @@ export async function getSeatInfo(req, res) {
       seatNumber: seatNumber,
       section: getSectionFromSeat(seatNumber),
       status: user.isActive ? "Occupied" : "Available",
-      student: user.isActive
+      student: user.name
         ? {
             name: user.name,
             plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
@@ -175,12 +175,15 @@ export async function updateSeat(req, res) {
     const seatNumber = req.params.seatNumber;
     const {studentName, planName, isActive, feePaid} = req.body;
 
+    // First check if seat exists
     const existingUser = await User.findOne({seatNumber});
     if (!existingUser) {
       return res.status(404).json({
         message: "Seat not found",
       });
     }
+
+    let updateData = {};
 
     if (studentName && planName) {
       // If assigning a new student to the seat
@@ -191,26 +194,52 @@ export async function updateSeat(req, res) {
         });
       }
 
-      // Update the user's information
-      existingUser.name = studentName;
-      existingUser.subscriptionPlan = subscriptionPlan._id;
-      existingUser.isActive = isActive !== undefined ? isActive : true;
-      existingUser.feePaid = feePaid !== undefined ? feePaid : false;
-      existingUser.joiningDate = new Date();
+      // Prepare update data for new student assignment
+      updateData = {
+        name: studentName,
+        subscriptionPlan: subscriptionPlan._id,
+        isActive: isActive !== undefined ? isActive : true,
+        feePaid: feePaid !== undefined ? feePaid : false,
+        joiningDate: new Date(),
+      };
+    } else if (isActive !== undefined) {
+      // Update seat status
+      updateData = {
+        isActive: isActive,
+        feePaid: feePaid !== undefined ? feePaid : existingUser.feePaid,
+      };
+
+      // If making seat available (isActive = false), don't clear the user data
+      // The seat will show as "Available" in the response but keep user history
+    } else if (feePaid !== undefined) {
+      // Only updating fee status
+      updateData = {
+        feePaid: feePaid,
+      };
     } else {
-      // Just update seat status (e.g., make available)
-      existingUser.isActive = isActive !== undefined ? isActive : false;
-      existingUser.feePaid =
-        feePaid !== undefined ? feePaid : existingUser.feePaid;
+      return res.status(400).json({
+        message: "No valid update data provided",
+      });
     }
 
-    await existingUser.save();
+    // Update using findOneAndUpdate
+    const updatedUser = await User.findOneAndUpdate({seatNumber}, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("subscriptionPlan", "planName duration");
 
     res.json({
       message: "Seat updated successfully!",
       seatNumber: seatNumber,
-      student: existingUser.name,
-      status: existingUser.isActive ? "Occupied" : "Available",
+      student: updatedUser.name || "Available",
+      plan: updatedUser.subscriptionPlan
+        ? updatedUser.subscriptionPlan.planName
+        : "-",
+      status: updatedUser.isActive ? "Occupied" : "Available",
+      feePaid: updatedUser.feePaid,
+      joiningDate: updatedUser.joiningDate
+        ? updatedUser.joiningDate.toISOString().split("T")[0]
+        : "-",
     });
   } catch (error) {
     console.error("Error updating seat:", error);
@@ -229,26 +258,31 @@ export async function getSeatManagement(req, res) {
       .sort({seatNumber: 1})
       .exec();
 
-    // Calculate simple seat statistics
+    // Filter out users with invalid seat numbers (for data consistency)
+    const validUsers = users.filter((user) =>
+      validateSeatNumber(user.seatNumber)
+    );
+
+    // Calculate simple seat statistics (only for valid seats)
     const totalSeats = 105; // Section A (66) + Section B (39) = 105
-    const occupiedSeats = await User.countDocuments({isActive: true});
+    const occupiedSeats = validUsers.filter((user) => user.isActive).length;
     const availableSeats = totalSeats - occupiedSeats;
 
-    // Section-wise statistics
-    const sectionAOccupied = await User.countDocuments({
-      seatNumber: {$regex: /^A/},
-      isActive: true,
-    });
-    const sectionBOccupied = await User.countDocuments({
-      seatNumber: {$regex: /^B/},
-      isActive: true,
-    });
+    // Section-wise statistics (only for valid seats)
+    const sectionAOccupied = validUsers.filter(
+      (user) =>
+        user.seatNumber && user.seatNumber.startsWith("A") && user.isActive
+    ).length;
+    const sectionBOccupied = validUsers.filter(
+      (user) =>
+        user.seatNumber && user.seatNumber.startsWith("B") && user.isActive
+    ).length;
 
-    // Prepare seat data for frontend
-    const seatData = users.map((user) => {
+    // Prepare seat data for frontend (only valid seats)
+    const seatData = validUsers.map((user) => {
       let expirationDate = null;
 
-      if (user.subscriptionPlan && user.isActive) {
+      if (user.subscriptionPlan && user.joiningDate) {
         // Calculate expiration date
         const joiningDate = new Date(user.joiningDate);
         const planDuration = user.subscriptionPlan.duration;
@@ -276,17 +310,14 @@ export async function getSeatManagement(req, res) {
       return {
         seatNumber: user.seatNumber,
         section: getSectionFromSeat(user.seatNumber),
-        student: user.isActive ? user.name : "Available",
-        plan:
-          user.isActive && user.subscriptionPlan
-            ? user.subscriptionPlan.planName
-            : "-",
-        joiningDate: user.isActive
+        student: user.name || "Available",
+        plan: user.subscriptionPlan ? user.subscriptionPlan.planName : "-",
+        joiningDate: user.joiningDate
           ? user.joiningDate.toISOString().split("T")[0]
           : "-",
         expirationDate: expirationDate || "-",
         status: user.isActive ? "Occupied" : "Available",
-        feePaid: user.feePaid,
+        feePaid: user.feePaid || false,
       };
     });
 
@@ -307,9 +338,54 @@ export async function getSeatManagement(req, res) {
         },
       },
       seats: seatData,
+      invalidSeats: users
+        .filter((user) => !validateSeatNumber(user.seatNumber))
+        .map((user) => ({
+          seatNumber: user.seatNumber,
+          studentName: user.name,
+          reason: "Invalid seat number format",
+        })),
     });
   } catch (error) {
     console.error("Error fetching seat management data:", error);
+    res.status(500).json({message: "Internal server error"});
+  }
+}
+
+// Function to clean up invalid seat numbers (admin use)
+export async function cleanupInvalidSeats(req, res) {
+  try {
+    // Find all users with invalid seat numbers
+    const allUsers = await User.find();
+    const invalidUsers = allUsers.filter(
+      (user) => !validateSeatNumber(user.seatNumber)
+    );
+
+    if (invalidUsers.length === 0) {
+      return res.json({
+        message: "No invalid seats found",
+        cleanedSeats: [],
+      });
+    }
+
+    // You can either delete these users or update their seat numbers
+    // For safety, let's just return the list for manual review
+    const invalidSeatData = invalidUsers.map((user) => ({
+      _id: user._id,
+      seatNumber: user.seatNumber,
+      studentName: user.name,
+      isActive: user.isActive,
+      reason: "Invalid seat number format - should be A1-A66 or B1-B39",
+    }));
+
+    res.json({
+      message: `Found ${invalidUsers.length} invalid seat(s)`,
+      invalidSeats: invalidSeatData,
+      suggestion:
+        "Please update these seat numbers to valid format (A1-A66 or B1-B39) or delete if they are test data",
+    });
+  } catch (error) {
+    console.error("Error cleaning up invalid seats:", error);
     res.status(500).json({message: "Internal server error"});
   }
 }

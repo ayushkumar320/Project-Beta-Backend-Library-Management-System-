@@ -13,10 +13,10 @@ const SubscriptionPlanSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  subscribers: {
-    type: Number,
-    default: 0,
-  },
+    subscribers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  }],
   status: {
     type: Boolean,
     default: false,

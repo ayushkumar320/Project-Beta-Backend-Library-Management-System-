@@ -18,6 +18,7 @@ import {
   getSeatManagement,
   getAvailableSeats,
   getSeatInfo,
+  cleanupInvalidSeats,
 } from "../controllers/seatManagment.controller.js";
 
 const router = express.Router();
@@ -37,5 +38,6 @@ router.put("/seat/:seatNumber", adminAuth, updateSeat);
 router.get("/seats", adminAuth, getSeatManagement);
 router.get("/seats/available", adminAuth, getAvailableSeats);
 router.get("/seat/:seatNumber", adminAuth, getSeatInfo);
+router.get("/seats/cleanup", adminAuth, cleanupInvalidSeats);
 
 export default router;
