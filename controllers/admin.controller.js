@@ -98,7 +98,6 @@ export async function createSubscriptionPlan(req, res) {
 export async function updateStudent(req, res) {
   const {
     name,
-    adharNumber,
     subscriptionPlan,
     joiningDate,
     feePaid,
@@ -109,59 +108,69 @@ export async function updateStudent(req, res) {
     isActive,
   } = req.body;
 
- try {
-  const updatedUser = await User.findOneAndUpdate(
-    { adharNumber },
-    {
-      name,
-      subscriptionPlan,
-      joiningDate,
-      feePaid,
-      seatNumber,
-      age,
-      address,
-      idNumber,
-      isActive,
-    },
-    { new: true }
-  );
+  // Get adharNumber from URL parameters and convert to number
+  const {adharNumber} = req.params;
+  const adharNumberAsNumber = parseInt(adharNumber);
 
-  if (!updatedUser) {
-    return res.status(404).json({ message: "User not found" });
+  // Validate adharNumber
+  if (isNaN(adharNumberAsNumber)) {
+    return res.status(400).json({message: "Invalid adharNumber format"});
   }
 
-  res.json({
-    name: updatedUser.name,
-    message: "User updated successfully",
-  });
-} catch (error) {
-  console.error("Error updating user:", error);
-  res.status(500).json({ message: "Internal server error" });
-}
+  try {
+    const updatedUser = await User.findOneAndUpdate(
+      {adharNumber: adharNumberAsNumber},
+      {
+        name,
+        subscriptionPlan,
+        joiningDate,
+        feePaid,
+        seatNumber,
+        age,
+        address,
+        idNumber,
+        isActive,
+      },
+      {new: true}
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({message: "User not found"});
+    }
+
+    res.json({
+      name: updatedUser.name,
+      adharNumber: updatedUser.adharNumber,
+      message: "User updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({message: "Internal server error"});
+  }
 }
 
 export async function updateSubscriptionPlan(req, res) {
   const {planName, price, duration, subscribers, status} = req.body;
 
-try {
-  const updatedPlan = await SubscriptionPlan.findOneAndUpdate(
-    { planName },
-    { price, duration, subscribers, status },
-    { new: true }
-  );
+  try {
+    const updatedPlan = await SubscriptionPlan.findOneAndUpdate(
+      {planName},
+      {price, duration, subscribers, status},
+      {new: true}
+    );
 
-  if (!updatedPlan) {
-    return res.status(404).json({ message: "Subscription plan not found" });
+    if (!updatedPlan) {
+      return res.status(404).json({message: "Subscription plan not found"});
+    }
+
+    res.json({
+      message: "Subscription plan updated successfully",
+      planName: updatedPlan.planName,
+    });
+  } catch (error) {
+    console.error("Error updating subscription plan:", error);
+    res.status(500).json({message: "Internal server error"});
   }
-
-  res.json({
-    message: "Subscription plan updated successfully",
-    planName: updatedPlan.planName,
-  });
-} catch (error) {
-  console.error("Error updating subscription plan:", error);
-  res.status(500).json({ message: "Internal server error" });
-}
 }
 
 // GET Controllers
@@ -188,22 +197,28 @@ export async function getUsers(req, res) {
 
 export async function getDashboardCount(req, res) {
   try {
-    const userCount = await User.countDocuments();
-    const planCount = await SubscriptionPlan.countDocuments();
+    // Get total number of users
+    const totalStudents = await User.countDocuments();
+
+    // Get total number of active users
     const activeUsers = await User.countDocuments({isActive: true});
 
-    // Get dynamic subscription expiry counts
+    // Get total number of subscription plans
+    const totalPlans = await SubscriptionPlan.countDocuments();
+
+    // Calculate available seats (assuming total capacity and occupied seats)
+    const occupiedSeats = await User.countDocuments({isActive: true});
+    // Total capacity: Section A (66) + Section B (39) = 105 seats
+    const totalCapacity = 105;
+    const availableSeats = totalCapacity - occupiedSeats;
+
+    // Calculate expiring soon (subscriptions expiring in next 5 days)
     const today = new Date();
     const users = await User.find({isActive: true})
       .populate("subscriptionPlan", "planName duration")
       .exec();
 
-    let expiringIn5Days = 0;
-    let expiredToday = 0;
-    let expiringIn1Day = 0;
-    let expiringIn2Days = 0;
-    let expiringIn3Days = 0;
-    let expiringIn4Days = 0;
+    let expiringSoon = 0;
 
     for (const user of users) {
       if (!user.subscriptionPlan) continue;
@@ -211,9 +226,10 @@ export async function getDashboardCount(req, res) {
       // Calculate expiration date based on joining date and plan duration
       const joiningDate = new Date(user.joiningDate);
       const planDuration = user.subscriptionPlan.duration;
-      const durationLower = planDuration.toLowerCase();
 
+      // Parse duration (handles formats like "1 week", "1 MONTH", "30 days", "6 MONTHS", etc.)
       let expirationDate = new Date(joiningDate);
+      const durationLower = planDuration.toLowerCase();
 
       if (durationLower.includes("day")) {
         const days = parseInt(planDuration.match(/\d+/)[0]);
@@ -229,52 +245,28 @@ export async function getDashboardCount(req, res) {
         expirationDate.setFullYear(joiningDate.getFullYear() + years);
       }
 
-      // Calculate days difference
+      // Check if expiration is within the next 5 days
       const timeDiff = expirationDate.getTime() - today.getTime();
       const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
-      // Categorize based on days left
-      if (daysDiff <= 0) {
-        expiredToday++;
-      } else if (daysDiff === 1) {
-        expiringIn1Day++;
-      } else if (daysDiff === 2) {
-        expiringIn2Days++;
-      } else if (daysDiff === 3) {
-        expiringIn3Days++;
-      } else if (daysDiff === 4) {
-        expiringIn4Days++;
-      } else if (daysDiff === 5) {
-        expiringIn5Days++;
+      if (daysDiff > 0 && daysDiff <= 5) {
+        expiringSoon++;
       }
     }
 
-    const totalExpiringIn5Days =
-      expiringIn1Day +
-      expiringIn2Days +
-      expiringIn3Days +
-      expiringIn4Days +
-      expiringIn5Days;
-
     res.json({
-      userCount,
-      planCount,
+      totalStudents,
+      availableSeats,
+      expiringSoon,
       activeUsers,
-      subscriptionExpiry: {
-        expiringIn5Days: totalExpiringIn5Days,
-        expiredToday,
-        breakdown: {
-          expiringIn1Day,
-          expiringIn2Days,
-          expiringIn3Days,
-          expiringIn4Days,
-          expiringIn5Days,
-        },
-      },
+      totalPlans,
+      message: "Dashboard data retrieved successfully",
     });
   } catch (error) {
-    console.error("Error fetching dashboard data:", error);
-    res.status(500).json({message: "Internal server error"});
+    console.error("Error in getDashboardCount:", error);
+    res
+      .status(500)
+      .json({message: "Internal server error", error: error.message});
   }
 }
 
@@ -344,4 +336,3 @@ export async function getSubscriptionEndingPlan(req, res) {
     res.status(500).json({message: "Internal server error"});
   }
 }
-

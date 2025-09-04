@@ -24,7 +24,7 @@ const SubscriptionPlanSchema = new mongoose.Schema({
 });
 
 const SubscriptionPlan = mongoose.model(
-  "subscriptionPlan",
+  "SubscriptionPlan",
   SubscriptionPlanSchema
 );
 export default SubscriptionPlan;
