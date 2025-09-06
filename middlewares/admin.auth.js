@@ -12,6 +12,7 @@ const adminAuth = async (req, res, next) => {
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log("Decoded token:", decoded);
     } catch (e) {
       return res
         .status(401)
@@ -21,6 +22,7 @@ const adminAuth = async (req, res, next) => {
         });
     }
     const admin = await Admin.findById(decoded._id);
+    console.log("Found admin:", admin);
     if (!admin) return res.status(401).json({message: "Admin not found"});
     req.token = token;
     req.admin = admin;
