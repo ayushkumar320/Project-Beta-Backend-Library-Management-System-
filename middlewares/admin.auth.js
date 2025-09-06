@@ -3,23 +3,29 @@ import Admin from "../models/admin.model.js";
 
 const adminAuth = async (req, res, next) => {
   try {
-    // Fixed the bearer token extraction
-    const token = req.header("Authorization").split(" ")[1];
-    if (!token) {
-      return res.status(401).json({message: "Authentication token is missing"});
+    const auth = req.header("Authorization") || "";
+    const parts = auth.trim().split(/\s+/);
+    if (parts.length !== 2 || !/^Bearer$/i.test(parts[0])) {
+      return res.status(401).json({message: "Authorization header malformed"});
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const admin = await Admin.findOne({_id: decoded._id});
-
-    if (!admin) {
-      return res.status(401).json({message: "Admin not found"});
+    const token = parts[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      return res
+        .status(401)
+        .json({
+          message:
+            e.name === "TokenExpiredError" ? "Token expired" : "Invalid token",
+        });
     }
-
+    const admin = await Admin.findById(decoded._id);
+    if (!admin) return res.status(401).json({message: "Admin not found"});
     req.token = token;
     req.admin = admin;
     next();
-  } catch (error) {
+  } catch (err) {
     res.status(401).json({message: "Please authenticate"});
   }
 };
