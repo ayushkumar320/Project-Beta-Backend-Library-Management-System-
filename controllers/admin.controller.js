@@ -58,9 +58,23 @@ export async function registerUser(req, res) {
     isActive,
   } = req.body;
   try {
-    const existingUser = await User.findOne({adharNumber});
+    const existingUser = await User.findOne({
+      $or: [{ adharNumber }, { idNumber }, { seatNumber }],
+    });
     if (existingUser) {
-      return res.status(400).json({message: "User already exists"});
+      if (existingUser.adharNumber === adharNumber) {
+        return res
+          .status(400)
+          .json({ message: "User with this Aadhar number already exists" });
+      } else if (existingUser.idNumber === idNumber) {
+        return res
+          .status(400)
+          .json({ message: "User with this ID number already exists" });
+      } else if (existingUser.seatNumber === seatNumber) {
+        return res
+          .status(400)
+          .json({ message: "This seat is already occupied" });
+      }
     }
     const user = new User({
       name,
