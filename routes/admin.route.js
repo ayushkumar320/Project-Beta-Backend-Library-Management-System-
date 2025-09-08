@@ -18,7 +18,7 @@ import {
   getAvailableSeats,
   getSeatInfo,
   cleanupInvalidSeats,
-} from "../controllers/seatManagement.controller.js";
+} from "../controllers/seatManagment.controller.js";
 
 const router = express.Router();
 
