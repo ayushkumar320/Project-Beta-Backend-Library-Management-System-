@@ -3,12 +3,12 @@ import Admin from "../models/admin.model.js";
 
 const adminAuth = async (req, res, next) => {
   try {
-    const auth = req.header("Authorization") || "";
-    const parts = auth.trim().split(/\s+/);
-    if (parts.length !== 2 || !/^Bearer$/i.test(parts[0])) {
+    let raw = req.header("Authorization") || req.header("authorization") || "";
+    if (!raw && req.header("x-auth-token")) raw = "Bearer " + req.header("x-auth-token");
+    if (!/^Bearer\s+\S+/.test(raw))
       return res.status(401).json({message: "Authorization header malformed"});
-    }
-    const token = parts[1];
+
+    const token = raw.split(/\s+/)[1];
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -16,18 +16,17 @@ const adminAuth = async (req, res, next) => {
     } catch (e) {
       return res
         .status(401)
-        .json({
-          message:
-            e.name === "TokenExpiredError" ? "Token expired" : "Invalid token",
-        });
+        .json({message: e.name === "TokenExpiredError" ? "Token expired" : "Invalid token"});
     }
+
     const admin = await Admin.findById(decoded._id);
     console.log("Found admin:", admin);
     if (!admin) return res.status(401).json({message: "Admin not found"});
-    req.token = token;
+
     req.admin = admin;
+    req.token = token;
     next();
-  } catch (err) {
+  } catch {
     res.status(401).json({message: "Please authenticate"});
   }
 };
