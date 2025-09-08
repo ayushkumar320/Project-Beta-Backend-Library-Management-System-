@@ -37,4 +37,5 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // Export for serverless
+// module.exports = app;
 export default app;
