@@ -7,13 +7,15 @@ import connectDB from "./db/connectDB.js";
 // Configure environment variables
 dotenv.config();
 
-connectDB();
-
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+connectDB();
+
+
 
 // Routes
 app.use("/api/admin", router);
