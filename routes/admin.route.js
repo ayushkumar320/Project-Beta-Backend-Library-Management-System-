@@ -11,7 +11,6 @@ import {
   getDashboardCount,
   getSubscriptionEndingPlan,
 } from "../controllers/admin.controller.js";
-
 import {
   addSeat,
   updateSeat,
@@ -19,18 +18,19 @@ import {
   getAvailableSeats,
   getSeatInfo,
   cleanupInvalidSeats,
-} from "../controllers/seatManagment.controller.js";
+} from "../controllers/seatManagement.controller.js";
 
 const router = express.Router();
 
 router.post("/login", adminLogin);
+
 router.post("/register", adminAuth, registerUser);
 router.post("/subscription", adminAuth, createSubscriptionPlan);
 router.put("/student/:adharNumber", adminAuth, updateStudent);
 router.put("/subscription", adminAuth, updateSubscriptionPlan);
 router.get("/subscriptions", adminAuth, getSubscriptionPlans);
 router.get("/users", adminAuth, getUsers);
-router.get("/dashboard", getDashboardCount); // Temporarily remove auth for testing
+router.get("/dashboard", adminAuth, getDashboardCount);
 router.get("/subscription-ending", adminAuth, getSubscriptionEndingPlan);
 
 router.post("/seat", adminAuth, addSeat);

@@ -1,96 +1,69 @@
 import User from "../models/user.model.js";
 import SubscriptionPlan from "../models/subscriptionPlan.model.js";
 
-// Simple utility functions for seat management
 function validateSeatNumber(seatNumber) {
-  // Simple validation: A1-A66 or B1-B39
-  const sectionARegex = /^A([1-9]|[1-5][0-9]|6[0-6])$/; // A1-A66
-  const sectionBRegex = /^B([1-9]|[1-2][0-9]|3[0-9])$/; // B1-B39
-  return sectionARegex.test(seatNumber) || sectionBRegex.test(seatNumber);
+  const sectionA = /^A([1-9]|[1-5][0-9]|6[0-6])$/;
+  const sectionB = /^B([1-9]|[1-2][0-9]|3[0-9])$/;
+  return sectionA.test(seatNumber) || sectionB.test(seatNumber);
 }
-
 function getSectionFromSeat(seatNumber) {
   return seatNumber ? seatNumber.charAt(0) : null;
 }
 
-// Get available seat numbers for frontend dropdown
 export async function getAvailableSeats(req, res) {
   try {
-    const {section} = req.query; // Optional: filter by section A or B
-
-    let availableSeats = [];
-
-    if (!section || section === "A") {
-      // Get available seats in Section A (A1 to A66)
-      for (let i = 1; i <= 66; i++) {
-        const seatNumber = `A${i}`;
-        const existingSeat = await User.findOne({seatNumber, isActive: true});
-        if (!existingSeat) {
-          availableSeats.push(seatNumber);
-        }
+    const {section} = req.query;
+    const active = await User.find({isActive: true}, {seatNumber: 1, _id: 0});
+    const taken = new Set(active.map((u) => u.seatNumber));
+    const out = [];
+    const pushRange = (p, max) => {
+      for (let i = 1; i <= max; i++) {
+        const seat = p + i;
+        if (!taken.has(seat)) out.push(seat);
       }
-    }
-
-    if (!section || section === "B") {
-      // Get available seats in Section B (B1 to B39)
-      for (let i = 1; i <= 39; i++) {
-        const seatNumber = `B${i}`;
-        const existingSeat = await User.findOne({seatNumber, isActive: true});
-        if (!existingSeat) {
-          availableSeats.push(seatNumber);
-        }
-      }
-    }
-
+    };
+    if (!section || section === "A") pushRange("A", 66);
+    if (!section || section === "B") pushRange("B", 39);
     res.json({
       message: "Available seats retrieved successfully",
-      availableSeats: availableSeats.sort(),
+      availableSeats: out.sort(),
     });
-  } catch (error) {
-    console.error("Error fetching available seats:", error);
+  } catch (err) {
+    console.error("getAvailableSeats error:", err);
     res.status(500).json({message: "Internal server error"});
   }
 }
 
-// Simple function to get seat information
 export async function getSeatInfo(req, res) {
   try {
     const {seatNumber} = req.params;
-
-    if (!validateSeatNumber(seatNumber)) {
-      return res.status(400).json({
-        message: "Invalid seat number format",
-      });
-    }
-
+    if (!validateSeatNumber(seatNumber))
+      return res.status(400).json({message: "Invalid seat number format"});
     const user = await User.findOne({seatNumber})
       .populate("subscriptionPlan", "planName duration")
       .exec();
-
-    if (!user) {
+    if (!user)
       return res.json({
-        seatNumber: seatNumber,
+        seatNumber,
         section: getSectionFromSeat(seatNumber),
         status: "Available",
         student: null,
       });
-    }
-
     res.json({
-      seatNumber: seatNumber,
+      seatNumber,
       section: getSectionFromSeat(seatNumber),
       status: user.isActive ? "Occupied" : "Available",
       student: user.name
         ? {
             name: user.name,
-            plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
+            plan: user.subscriptionPlan?.planName || null,
             joiningDate: user.joiningDate,
             feePaid: user.feePaid,
           }
         : null,
     });
-  } catch (error) {
-    console.error("Error fetching seat information:", error);
+  } catch (err) {
+    console.error("getSeatInfo error:", err);
     res.status(500).json({message: "Internal server error"});
   }
 }
@@ -107,43 +80,25 @@ export async function addSeat(req, res) {
       idNumber,
     } = req.body;
 
-    // Simple validation: Check if seat number format is correct
-    if (!validateSeatNumber(seatNumber)) {
+    if (!validateSeatNumber(seatNumber))
       return res.status(400).json({
         message:
-          "Invalid seat number. Use format A1-A66 for Section A or B1-B39 for Section B",
+          "Invalid seat number. Use A1-A66 (A) or B1-B39 (B)",
       });
-    }
 
-    // Check if seat number is already taken
-    const existingSeat = await User.findOne({seatNumber});
-    if (existingSeat) {
-      return res.status(400).json({
-        message: "Seat number already exists",
-      });
-    }
+    if (await User.findOne({seatNumber}))
+      return res.status(400).json({message: "Seat number already exists"});
 
-    // Check if Adhar number already exists
-    const existingUser = await User.findOne({adharNumber});
-    if (existingUser) {
-      return res.status(400).json({
-        message: "User with this Adhar number already exists",
-      });
-    }
+    if (await User.findOne({adharNumber}))
+      return res.status(400).json({message: "User with this Adhar number already exists"});
 
-    // Find subscription plan
-    const subscriptionPlan = await SubscriptionPlan.findOne({planName});
-    if (!subscriptionPlan) {
-      return res.status(404).json({
-        message: "Subscription plan not found",
-      });
-    }
+    const plan = await SubscriptionPlan.findOne({planName});
+    if (!plan) return res.status(404).json({message: "Subscription plan not found"});
 
-    // Create new user with seat assignment
-    const newUser = new User({
+    const newUser = await User.create({
       name: studentName,
       adharNumber,
-      subscriptionPlan: subscriptionPlan._id,
+      subscriptionPlan: plan._id,
       joiningDate: new Date(),
       feePaid: false,
       seatNumber,
@@ -153,171 +108,117 @@ export async function addSeat(req, res) {
       isActive: true,
     });
 
-    await newUser.save();
-
     res.json({
       message: "Seat allocated successfully!",
-      seatNumber: seatNumber,
+      seatNumber,
       section: getSectionFromSeat(seatNumber),
       student: studentName,
       plan: planName,
     });
-  } catch (error) {
-    console.error("Error allocating seat:", error);
-    res.status(500).json({
-      message: "Internal server error",
-    });
+  } catch (err) {
+    console.error("addSeat error:", err);
+    res.status(500).json({message: "Internal server error"});
   }
 }
 
 export async function updateSeat(req, res) {
   try {
-    const seatNumber = req.params.seatNumber;
+    const {seatNumber} = req.params;
     const {studentName, planName, isActive, feePaid} = req.body;
 
-    // First check if seat exists
-    const existingUser = await User.findOne({seatNumber});
-    if (!existingUser) {
-      return res.status(404).json({
-        message: "Seat not found",
-      });
-    }
+    const existing = await User.findOne({seatNumber});
+    if (!existing) return res.status(404).json({message: "Seat not found"});
 
     let updateData = {};
 
     if (studentName && planName) {
-      // If assigning a new student to the seat
-      const subscriptionPlan = await SubscriptionPlan.findOne({planName});
-      if (!subscriptionPlan) {
-        return res.status(404).json({
-          message: "Subscription plan not found",
-        });
-      }
-
-      // Prepare update data for new student assignment
+      const plan = await SubscriptionPlan.findOne({planName});
+      if (!plan)
+        return res.status(404).json({message: "Subscription plan not found"});
       updateData = {
         name: studentName,
-        subscriptionPlan: subscriptionPlan._id,
+        subscriptionPlan: plan._id,
         isActive: isActive !== undefined ? isActive : true,
         feePaid: feePaid !== undefined ? feePaid : false,
         joiningDate: new Date(),
       };
     } else if (isActive !== undefined) {
-      // Update seat status
       updateData = {
-        isActive: isActive,
-        feePaid: feePaid !== undefined ? feePaid : existingUser.feePaid,
+        isActive,
+        feePaid: feePaid !== undefined ? feePaid : existing.feePaid,
       };
-
-      // If making seat available (isActive = false), don't clear the user data
-      // The seat will show as "Available" in the response but keep user history
     } else if (feePaid !== undefined) {
-      // Only updating fee status
-      updateData = {
-        feePaid: feePaid,
-      };
+      updateData = {feePaid};
     } else {
-      return res.status(400).json({
-        message: "No valid update data provided",
-      });
+      return res.status(400).json({message: "No valid update data provided"});
     }
 
-    // Update using findOneAndUpdate
-    const updatedUser = await User.findOneAndUpdate({seatNumber}, updateData, {
+    const updated = await User.findOneAndUpdate({seatNumber}, updateData, {
       new: true,
       runValidators: true,
     }).populate("subscriptionPlan", "planName duration");
 
     res.json({
       message: "Seat updated successfully!",
-      seatNumber: seatNumber,
-      student: updatedUser.name || "Available",
-      plan: updatedUser.subscriptionPlan
-        ? updatedUser.subscriptionPlan.planName
-        : "-",
-      status: updatedUser.isActive ? "Occupied" : "Available",
-      feePaid: updatedUser.feePaid,
-      joiningDate: updatedUser.joiningDate
-        ? updatedUser.joiningDate.toISOString().split("T")[0]
+      seatNumber,
+      student: updated.name || "Available",
+      plan: updated.subscriptionPlan?.planName || "-",
+      status: updated.isActive ? "Occupied" : "Available",
+      feePaid: updated.feePaid,
+      joiningDate: updated.joiningDate
+        ? updated.joiningDate.toISOString().split("T")[0]
         : "-",
     });
-  } catch (error) {
-    console.error("Error updating seat:", error);
-    res.status(500).json({
-      message: "Internal server error",
-    });
+  } catch (err) {
+    console.error("updateSeat error:", err);
+    res.status(500).json({message: "Internal server error"});
   }
 }
 
-// For seat management - GET request (simplified)
 export async function getSeatManagement(req, res) {
   try {
-    // Get all users with their subscription plans populated
     const users = await User.find()
       .populate("subscriptionPlan", "planName duration")
-      .sort({seatNumber: 1})
-      .exec();
+      .sort({seatNumber: 1});
 
-    // Filter out users with invalid seat numbers (for data consistency)
-    const validUsers = users.filter((user) =>
-      validateSeatNumber(user.seatNumber)
-    );
-
-    // Calculate simple seat statistics (only for valid seats)
-    const totalSeats = 105; // Section A (66) + Section B (39) = 105
-    const occupiedSeats = validUsers.filter((user) => user.isActive).length;
+    const validUsers = users.filter((u) => validateSeatNumber(u.seatNumber));
+    const totalSeats = 105;
+    const occupiedSeats = validUsers.filter((u) => u.isActive).length;
     const availableSeats = totalSeats - occupiedSeats;
 
-    // Section-wise statistics (only for valid seats)
     const sectionAOccupied = validUsers.filter(
-      (user) =>
-        user.seatNumber && user.seatNumber.startsWith("A") && user.isActive
+      (u) => u.seatNumber?.startsWith("A") && u.isActive
     ).length;
     const sectionBOccupied = validUsers.filter(
-      (user) =>
-        user.seatNumber && user.seatNumber.startsWith("B") && user.isActive
+      (u) => u.seatNumber?.startsWith("B") && u.isActive
     ).length;
 
-    // Prepare seat data for frontend (only valid seats)
-    const seatData = validUsers.map((user) => {
-      let expirationDate = null;
-
-      if (user.subscriptionPlan && user.joiningDate) {
-        // Calculate expiration date
-        const joiningDate = new Date(user.joiningDate);
-        const planDuration = user.subscriptionPlan.duration;
-        const durationLower = planDuration.toLowerCase();
-
-        let expDate = new Date(joiningDate);
-
-        if (durationLower.includes("day")) {
-          const days = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setDate(joiningDate.getDate() + days);
-        } else if (durationLower.includes("week")) {
-          const weeks = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setDate(joiningDate.getDate() + weeks * 7);
-        } else if (durationLower.includes("month")) {
-          const months = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setMonth(joiningDate.getMonth() + months);
-        } else if (durationLower.includes("year")) {
-          const years = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setFullYear(joiningDate.getFullYear() + years);
-        }
-
-        expirationDate = expDate.toISOString().split("T")[0];
+    const seats = validUsers.map((u) => {
+      let expirationDate = "-";
+      if (u.subscriptionPlan && u.joiningDate) {
+        const jd = new Date(u.joiningDate);
+        const dur = u.subscriptionPlan.duration.toLowerCase();
+        let exp = new Date(jd);
+        if (dur.includes("day")) exp.setDate(jd.getDate() + parseInt(dur));
+        else if (dur.includes("week"))
+          exp.setDate(jd.getDate() + parseInt(dur) * 7);
+        else if (dur.includes("month"))
+          exp.setMonth(jd.getMonth() + parseInt(dur));
+        else if (dur.includes("year"))
+          exp.setFullYear(jd.getFullYear() + parseInt(dur));
+        expirationDate = exp.toISOString().split("T")[0];
       }
-
       return {
-        seatNumber: user.seatNumber,
-        section: getSectionFromSeat(user.seatNumber),
-        student: user.name || "Available",
-        plan: user.subscriptionPlan ? user.subscriptionPlan.planName : "-",
-        joiningDate: user.joiningDate
-          ? user.joiningDate.toISOString().split("T")[0]
+        seatNumber: u.seatNumber,
+        section: getSectionFromSeat(u.seatNumber),
+        student: u.name || "Available",
+        plan: u.subscriptionPlan?.planName || "-",
+        joiningDate: u.joiningDate
+          ? u.joiningDate.toISOString().split("T")[0]
           : "-",
-        expirationDate: expirationDate || "-",
-        status: user.isActive ? "Occupied" : "Available",
-        feePaid: user.feePaid || false,
+        expirationDate,
+        status: u.isActive ? "Occupied" : "Available",
+        feePaid: !!u.feePaid,
       };
     });
 
@@ -337,55 +238,41 @@ export async function getSeatManagement(req, res) {
           available: 39 - sectionBOccupied,
         },
       },
-      seats: seatData,
+      seats,
       invalidSeats: users
-        .filter((user) => !validateSeatNumber(user.seatNumber))
-        .map((user) => ({
-          seatNumber: user.seatNumber,
-          studentName: user.name,
+        .filter((u) => !validateSeatNumber(u.seatNumber))
+        .map((u) => ({
+          seatNumber: u.seatNumber,
+          studentName: u.name,
           reason: "Invalid seat number format",
         })),
     });
-  } catch (error) {
-    console.error("Error fetching seat management data:", error);
+  } catch (err) {
+    console.error("getSeatManagement error:", err);
     res.status(500).json({message: "Internal server error"});
   }
 }
 
-// Function to clean up invalid seat numbers (admin use)
 export async function cleanupInvalidSeats(req, res) {
   try {
-    // Find all users with invalid seat numbers
-    const allUsers = await User.find();
-    const invalidUsers = allUsers.filter(
-      (user) => !validateSeatNumber(user.seatNumber)
-    );
-
-    if (invalidUsers.length === 0) {
-      return res.json({
-        message: "No invalid seats found",
-        cleanedSeats: [],
-      });
-    }
-
-    // You can either delete these users or update their seat numbers
-    // For safety, let's just return the list for manual review
-    const invalidSeatData = invalidUsers.map((user) => ({
-      _id: user._id,
-      seatNumber: user.seatNumber,
-      studentName: user.name,
-      isActive: user.isActive,
-      reason: "Invalid seat number format - should be A1-A66 or B1-B39",
-    }));
-
+    const all = await User.find();
+    const invalid = all.filter((u) => !validateSeatNumber(u.seatNumber));
+    if (invalid.length === 0)
+      return res.json({message: "No invalid seats found", cleanedSeats: []});
     res.json({
-      message: `Found ${invalidUsers.length} invalid seat(s)`,
-      invalidSeats: invalidSeatData,
+      message: `Found ${invalid.length} invalid seat(s)`,
+      invalidSeats: invalid.map((u) => ({
+        _id: u._id,
+        seatNumber: u.seatNumber,
+        studentName: u.name,
+        isActive: u.isActive,
+        reason: "Invalid seat number format - should be A1-A66 or B1-B39",
+      })),
       suggestion:
-        "Please update these seat numbers to valid format (A1-A66 or B1-B39) or delete if they are test data",
+        "Update these seat numbers to valid format or delete if test data",
     });
-  } catch (error) {
-    console.error("Error cleaning up invalid seats:", error);
+  } catch (err) {
+    console.error("cleanupInvalidSeats error:", err);
     res.status(500).json({message: "Internal server error"});
   }
 }
