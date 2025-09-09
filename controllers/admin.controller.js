@@ -94,6 +94,14 @@ export async function registerUser(req, res) {
       });
     }
 
+    // Check if subscription plan exists in database
+    const planExists = await SubscriptionPlan.findById(subscriptionPlan);
+    if (!planExists) {
+      return res.status(400).json({
+        message: "Subscription plan not found. Please provide a valid plan ID.",
+      });
+    }
+
     const existingUser = await User.findOne({
       $or: [
         {adharNumber: adharNumberAsNumber},
@@ -217,6 +225,23 @@ export async function updateStudent(req, res) {
   try {
     // Ensure database connection
     await connectDB();
+
+    // Validate subscriptionPlan if provided
+    if (subscriptionPlan) {
+      if (!mongoose.Types.ObjectId.isValid(subscriptionPlan)) {
+        return res.status(400).json({
+          message: "Invalid subscriptionPlan ID format",
+        });
+      }
+
+      const planExists = await SubscriptionPlan.findById(subscriptionPlan);
+      if (!planExists) {
+        return res.status(400).json({
+          message: "Subscription plan not found. Please provide a valid plan ID.",
+        });
+      }
+    }
+
     const user = await User.findOne({adharNumber: adharNumberAsNumber});
 
     if (!user) {
@@ -311,7 +336,11 @@ export async function getSubscriptionPlans(req, res) {
     // Ensure database connection
     await connectDB();
     const plans = await SubscriptionPlan.find();
-    res.json(plans);
+    res.json({
+      message: "Subscription plans retrieved successfully",
+      count: plans.length,
+      plans: plans
+    });
   } catch (error) {
     console.error("Error fetching subscription plans:", error);
     res.status(500).json({message: "Internal server error"});
