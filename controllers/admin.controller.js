@@ -40,7 +40,7 @@ export async function adminLogin(req, res) {
     console.error("Error logging in admin:", error);
     res
       .status(500)
-      .json({message: "Internal server error", error: error.message});
+      .json({message: "Internal server error occured", error: error.message});
   }
 }
 
