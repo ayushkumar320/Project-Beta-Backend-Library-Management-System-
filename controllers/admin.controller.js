@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import Admin from "../models/admin.model.js";
 import User from "../models/user.model.js";
 import SubscriptionPlan from "../models/subscriptionPlan.model.js";
@@ -60,15 +61,41 @@ export async function registerUser(req, res) {
   try {
     // Ensure database connection
     await connectDB();
+
+    // Input validation for required fields
+    if (!name || !adharNumber || !subscriptionPlan || !seatNumber || !idNumber) {
+      return res.status(400).json({
+        message: "Missing required fields: name, adharNumber, subscriptionPlan, seatNumber, and idNumber are required"
+      });
+    }
+
+    // Convert string numbers to actual numbers
+    const adharNumberAsNumber = parseInt(adharNumber);
+    const idNumberAsNumber = parseInt(idNumber);
+
+    // Validate number conversions
+    if (isNaN(adharNumberAsNumber) || isNaN(idNumberAsNumber)) {
+      return res.status(400).json({
+        message: "adharNumber and idNumber must be valid numbers"
+      });
+    }
+
+    // Validate subscriptionPlan is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(subscriptionPlan)) {
+      return res.status(400).json({
+        message: "Invalid subscriptionPlan ID format"
+      });
+    }
+
     const existingUser = await User.findOne({
-      $or: [{ adharNumber }, { idNumber }, { seatNumber }],
+      $or: [{ adharNumber: adharNumberAsNumber }, { idNumber: idNumberAsNumber }, { seatNumber }],
     });
     if (existingUser) {
-      if (existingUser.adharNumber === adharNumber) {
+      if (existingUser.adharNumber === adharNumberAsNumber) {
         return res
           .status(400)
           .json({ message: "User with this Aadhar number already exists" });
-      } else if (existingUser.idNumber === idNumber) {
+      } else if (existingUser.idNumber === idNumberAsNumber) {
         return res
           .status(400)
           .json({ message: "User with this ID number already exists" });
@@ -78,18 +105,33 @@ export async function registerUser(req, res) {
           .json({ message: "This seat is already occupied" });
       }
     }
-    const user = new User({
+    // Prepare user data with proper types and defaults
+    const userData = {
       name,
-      adharNumber,
+      adharNumber: adharNumberAsNumber,
       subscriptionPlan,
-      joiningDate,
-      feePaid,
       seatNumber,
-      age,
-      address,
-      idNumber,
-      isActive,
-    });
+      idNumber: idNumberAsNumber,
+    };
+
+    // Add optional fields only if provided
+    if (joiningDate) {
+      userData.joiningDate = new Date(joiningDate);
+    }
+    if (feePaid !== undefined) {
+      userData.feePaid = Boolean(feePaid);
+    }
+    if (age !== undefined) {
+      userData.age = parseInt(age);
+    }
+    if (address) {
+      userData.address = address;
+    }
+    if (isActive !== undefined) {
+      userData.isActive = Boolean(isActive);
+    }
+
+    const user = new User(userData);
     await user.save();
 
     // Add user to the subscription plan's subscribers list
