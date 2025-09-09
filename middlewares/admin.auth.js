@@ -1,8 +1,11 @@
 import jwt from "jsonwebtoken";
 import Admin from "../models/admin.model.js";
+import connectDB from "../db/connectDB.js";
 
 const adminAuth = async (req, res, next) => {
   try {
+    // Ensure database connection
+    await connectDB();
     const auth = req.header("Authorization") || "";
     const parts = auth.trim().split(/\s+/);
     if (parts.length !== 2 || !/^Bearer$/i.test(parts[0])) {

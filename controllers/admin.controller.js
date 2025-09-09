@@ -58,6 +58,8 @@ export async function registerUser(req, res) {
     isActive,
   } = req.body;
   try {
+    // Ensure database connection
+    await connectDB();
     const existingUser = await User.findOne({
       $or: [{ adharNumber }, { idNumber }, { seatNumber }],
     });
@@ -109,6 +111,8 @@ export async function registerUser(req, res) {
 export async function createSubscriptionPlan(req, res) {
   const {planName, price, duration, subscribers, status} = req.body;
   try {
+    // Ensure database connection
+    await connectDB();
     const existingPlan = await SubscriptionPlan.findOne({
       planName,
     });
@@ -160,6 +164,8 @@ export async function updateStudent(req, res) {
   }
 
   try {
+    // Ensure database connection
+    await connectDB();
     const user = await User.findOne({adharNumber: adharNumberAsNumber});
 
     if (!user) {
@@ -225,6 +231,8 @@ export async function updateSubscriptionPlan(req, res) {
   const {planName, price, duration, subscribers, status} = req.body;
 
   try {
+    // Ensure database connection
+    await connectDB();
     const updatedPlan = await SubscriptionPlan.findOneAndUpdate(
       {planName},
       {price, duration, subscribers, status},
@@ -249,6 +257,8 @@ export async function updateSubscriptionPlan(req, res) {
 
 export async function getSubscriptionPlans(req, res) {
   try {
+    // Ensure database connection
+    await connectDB();
     const plans = await SubscriptionPlan.find();
     res.json(plans);
   } catch (error) {
@@ -259,6 +269,8 @@ export async function getSubscriptionPlans(req, res) {
 
 export async function getUsers(req, res) {
   try {
+    // Ensure database connection
+    await connectDB();
     const users = await User.find();
     res.json(users);
   } catch (error) {
@@ -269,6 +281,8 @@ export async function getUsers(req, res) {
 
 export async function getDashboardCount(req, res) {
   try {
+    // Ensure database connection
+    await connectDB();
     // Get total number of users
     const totalStudents = await User.countDocuments();
 
@@ -344,6 +358,8 @@ export async function getDashboardCount(req, res) {
 
 export async function getSubscriptionEndingPlan(req, res) {
   try {
+    // Ensure database connection
+    await connectDB();
     const today = new Date();
     const fiveDaysFromNow = new Date();
     fiveDaysFromNow.setDate(today.getDate() + 5);
