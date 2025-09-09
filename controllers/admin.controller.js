@@ -326,16 +326,29 @@ export async function updateStudent(req, res) {
 }
 
 export async function updateSubscriptionPlan(req, res) {
-  const {planName, price, duration, subscribers, status} = req.body;
+  const {planId, _id, planName, price, duration, subscribers, status} = req.body;
 
   try {
     // Ensure database connection
     await connectDB();
-    const updatedPlan = await SubscriptionPlan.findOneAndUpdate(
-      {planName},
-      {price, duration, subscribers, status},
-      {new: true}
-    );
+    let updatedPlan = null;
+
+    // Prefer updating by id if provided
+    const id = planId || _id;
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      const updateFields = {price, duration, subscribers, status};
+      if (planName) updateFields.planName = planName;
+      updatedPlan = await SubscriptionPlan.findByIdAndUpdate(id, updateFields, {
+        new: true,
+      });
+    } else if (planName) {
+      // Fallback: update by current planName (legacy behavior)
+      updatedPlan = await SubscriptionPlan.findOneAndUpdate(
+        {planName},
+        {price, duration, subscribers, status},
+        {new: true}
+      );
+    }
 
     if (!updatedPlan) {
       return res.status(404).json({message: "Subscription plan not found"});
