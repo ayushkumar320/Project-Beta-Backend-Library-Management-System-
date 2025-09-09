@@ -5,6 +5,7 @@ import {
   registerUser,
   createSubscriptionPlan,
   updateStudent,
+  deleteStudent,
   updateSubscriptionPlan,
   getSubscriptionPlans,
   getUsers,
@@ -27,6 +28,7 @@ router.post("/login", adminLogin);
 router.post("/register", adminAuth, registerUser);
 router.post("/subscription", adminAuth, createSubscriptionPlan);
 router.put("/student/:adharNumber", adminAuth, updateStudent);
+router.delete("/student/:adharNumber", adminAuth, deleteStudent);
 router.put("/subscription", adminAuth, updateSubscriptionPlan);
 router.get("/subscriptions", adminAuth, getSubscriptionPlans);
 router.get("/users", adminAuth, getUsers);

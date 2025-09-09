@@ -500,3 +500,45 @@ export async function getSubscriptionEndingPlan(req, res) {
     res.status(500).json({message: "Internal server error"});
   }
 }
+
+export async function deleteStudent(req, res) {
+  const {adharNumber} = req.params;
+  const adharNumberAsNumber = parseInt(adharNumber);
+
+  // Validate adharNumber
+  if (isNaN(adharNumberAsNumber)) {
+    return res.status(400).json({message: "Invalid adharNumber format"});
+  }
+
+  try {
+    // Ensure database connection
+    await connectDB();
+
+    // Find the user first
+    const user = await User.findOne({adharNumber: adharNumberAsNumber});
+    if (!user) {
+      return res.status(404).json({message: "User not found"});
+    }
+
+    // Remove user from subscription plan's subscribers list
+    if (user.subscriptionPlan) {
+      await SubscriptionPlan.findByIdAndUpdate(
+        user.subscriptionPlan,
+        {$pull: {subscribers: user._id}},
+        {new: true}
+      );
+    }
+
+    // Delete the user
+    await User.findByIdAndDelete(user._id);
+
+    res.json({
+      message: "Student deleted successfully",
+      name: user.name,
+      adharNumber: user.adharNumber,
+    });
+  } catch (error) {
+    console.error("Error deleting student:", error);
+    res.status(500).json({message: "Internal server error"});
+  }
+}
