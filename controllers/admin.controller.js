@@ -336,11 +336,7 @@ export async function getSubscriptionPlans(req, res) {
     // Ensure database connection
     await connectDB();
     const plans = await SubscriptionPlan.find();
-    res.json({
-      message: "Subscription plans retrieved successfully",
-      count: plans.length,
-      plans: plans
-    });
+    res.json(plans);
   } catch (error) {
     console.error("Error fetching subscription plans:", error);
     res.status(500).json({message: "Internal server error"});
