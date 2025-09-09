@@ -102,9 +102,17 @@ export async function registerUser(req, res) {
     }
 
     // Validate subscriptionPlan is a valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(subscriptionPlan)) {
+    console.log("Validating subscriptionPlan ID:", subscriptionPlan);
+    console.log(
+      "Is valid ObjectId:",
+      mongoose.Types.ObjectId.isValid(subscriptionPlan)
+    );
+    const planExists = await SubscriptionPlan.findById(subscriptionPlan);
+    console.log("Does plan exist in database:", !!planExists);
+
+    if (!mongoose.Types.ObjectId.isValid(subscriptionPlan) || !planExists) {
       return res.status(400).json({
-        message: "Invalid subscriptionPlan ID format",
+        message: "Invalid subscriptionPlan ID format or plan does not exist",
       });
     }
 
