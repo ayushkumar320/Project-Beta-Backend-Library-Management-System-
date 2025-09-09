@@ -62,20 +62,6 @@ export async function registerUser(req, res) {
     // Ensure database connection
     await connectDB();
 
-    // DEBUG: Log the received data
-    console.log("=== BACKEND REGISTRATION DEBUG ===");
-    console.log("Received request body:", req.body);
-    console.log("subscriptionPlan value:", subscriptionPlan);
-    console.log("subscriptionPlan type:", typeof subscriptionPlan);
-    console.log(
-      "subscriptionPlan length:",
-      subscriptionPlan ? subscriptionPlan.length : "undefined"
-    );
-    console.log("Is empty string:", subscriptionPlan === "");
-    console.log("Is undefined:", subscriptionPlan === undefined);
-    console.log("Is null:", subscriptionPlan === null);
-    console.log("=== END BACKEND DEBUG ===");
-
     // Input validation for required fields
     if (
       !name ||
@@ -102,17 +88,9 @@ export async function registerUser(req, res) {
     }
 
     // Validate subscriptionPlan is a valid ObjectId
-    console.log("Validating subscriptionPlan ID:", subscriptionPlan);
-    console.log(
-      "Is valid ObjectId:",
-      mongoose.Types.ObjectId.isValid(subscriptionPlan)
-    );
-    const planExists = await SubscriptionPlan.findById(subscriptionPlan);
-    console.log("Does plan exist in database:", !!planExists);
-
-    if (!mongoose.Types.ObjectId.isValid(subscriptionPlan) || !planExists) {
+    if (!mongoose.Types.ObjectId.isValid(subscriptionPlan)) {
       return res.status(400).json({
-        message: "Invalid subscriptionPlan ID format or plan does not exist",
+        message: "Invalid subscriptionPlan ID format",
       });
     }
 
