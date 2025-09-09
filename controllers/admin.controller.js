@@ -62,10 +62,31 @@ export async function registerUser(req, res) {
     // Ensure database connection
     await connectDB();
 
+    // DEBUG: Log the received data
+    console.log("=== BACKEND REGISTRATION DEBUG ===");
+    console.log("Received request body:", req.body);
+    console.log("subscriptionPlan value:", subscriptionPlan);
+    console.log("subscriptionPlan type:", typeof subscriptionPlan);
+    console.log(
+      "subscriptionPlan length:",
+      subscriptionPlan ? subscriptionPlan.length : "undefined"
+    );
+    console.log("Is empty string:", subscriptionPlan === "");
+    console.log("Is undefined:", subscriptionPlan === undefined);
+    console.log("Is null:", subscriptionPlan === null);
+    console.log("=== END BACKEND DEBUG ===");
+
     // Input validation for required fields
-    if (!name || !adharNumber || !subscriptionPlan || !seatNumber || !idNumber) {
+    if (
+      !name ||
+      !adharNumber ||
+      !subscriptionPlan ||
+      !seatNumber ||
+      !idNumber
+    ) {
       return res.status(400).json({
-        message: "Missing required fields: name, adharNumber, subscriptionPlan, seatNumber, and idNumber are required"
+        message:
+          "Missing required fields: name, adharNumber, subscriptionPlan, seatNumber, and idNumber are required",
       });
     }
 
@@ -76,33 +97,35 @@ export async function registerUser(req, res) {
     // Validate number conversions
     if (isNaN(adharNumberAsNumber) || isNaN(idNumberAsNumber)) {
       return res.status(400).json({
-        message: "adharNumber and idNumber must be valid numbers"
+        message: "adharNumber and idNumber must be valid numbers",
       });
     }
 
     // Validate subscriptionPlan is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(subscriptionPlan)) {
       return res.status(400).json({
-        message: "Invalid subscriptionPlan ID format"
+        message: "Invalid subscriptionPlan ID format",
       });
     }
 
     const existingUser = await User.findOne({
-      $or: [{ adharNumber: adharNumberAsNumber }, { idNumber: idNumberAsNumber }, { seatNumber }],
+      $or: [
+        {adharNumber: adharNumberAsNumber},
+        {idNumber: idNumberAsNumber},
+        {seatNumber},
+      ],
     });
     if (existingUser) {
       if (existingUser.adharNumber === adharNumberAsNumber) {
         return res
           .status(400)
-          .json({ message: "User with this Aadhar number already exists" });
+          .json({message: "User with this Aadhar number already exists"});
       } else if (existingUser.idNumber === idNumberAsNumber) {
         return res
           .status(400)
-          .json({ message: "User with this ID number already exists" });
+          .json({message: "User with this ID number already exists"});
       } else if (existingUser.seatNumber === seatNumber) {
-        return res
-          .status(400)
-          .json({ message: "This seat is already occupied" });
+        return res.status(400).json({message: "This seat is already occupied"});
       }
     }
     // Prepare user data with proper types and defaults
