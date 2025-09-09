@@ -8,7 +8,7 @@ const UserSchema = new mongoose.Schema({
   // Morning | Evening | Full day | 24 Hour
   slot: {
     type: String,
-    enum: ["Morning", "Evening", "Full day", "24 Hour"],
+    enum: ["Morning", "Evening", "Full day", "24 Hour", "Short Slot"],
   },
   adharNumber: {
     type: Number,
