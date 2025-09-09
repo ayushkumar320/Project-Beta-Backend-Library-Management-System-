@@ -48,6 +48,7 @@ export async function adminLogin(req, res) {
 export async function registerUser(req, res) {
   const {
     name,
+    slot,
     adharNumber,
     subscriptionPlan,
     joiningDate,
@@ -55,8 +56,11 @@ export async function registerUser(req, res) {
     seatNumber,
     age,
     address,
+    examPreparingFor,
+    schoolOrCollegeName,
     idNumber,
     isActive,
+    lockerService,
   } = req.body;
   try {
     // Ensure database connection
@@ -125,6 +129,7 @@ export async function registerUser(req, res) {
     // Prepare user data with proper types and defaults
     const userData = {
       name,
+      slot,
       adharNumber: adharNumberAsNumber,
       subscriptionPlan,
       seatNumber,
@@ -144,8 +149,17 @@ export async function registerUser(req, res) {
     if (address) {
       userData.address = address;
     }
+    if (examPreparingFor) {
+      userData.examPreparingFor = examPreparingFor;
+    }
+    if (schoolOrCollegeName) {
+      userData.schoolOrCollegeName = schoolOrCollegeName;
+    }
     if (isActive !== undefined) {
       userData.isActive = Boolean(isActive);
+    }
+    if (lockerService !== undefined) {
+      userData.lockerService = Boolean(lockerService);
     }
 
     const user = new User(userData);
@@ -203,14 +217,18 @@ export async function createSubscriptionPlan(req, res) {
 export async function updateStudent(req, res) {
   const {
     name,
+    slot,
     subscriptionPlan,
     joiningDate,
     feePaid,
     seatNumber,
     age,
     address,
+    examPreparingFor,
+    schoolOrCollegeName,
     idNumber,
     isActive,
+    lockerService,
   } = req.body;
 
   // Get adharNumber from URL parameters and convert to number
@@ -254,14 +272,18 @@ export async function updateStudent(req, res) {
       {adharNumber: adharNumberAsNumber},
       {
         name,
+        slot,
         subscriptionPlan,
         joiningDate,
         feePaid,
         seatNumber,
         age,
         address,
+        examPreparingFor,
+        schoolOrCollegeName,
         idNumber,
         isActive,
+        lockerService,
       },
       {new: true}
     );

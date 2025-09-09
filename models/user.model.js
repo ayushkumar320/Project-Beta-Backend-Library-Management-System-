@@ -5,6 +5,11 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  // Morning | Evening | Full day | 24 Hour
+  slot: {
+    type: String,
+    enum: ["Morning", "Evening", "Full day", "24 Hour"],
+  },
   adharNumber: {
     type: Number,
     required: true,
@@ -35,12 +40,23 @@ const UserSchema = new mongoose.Schema({
   address: {
     type: String,
   },
+  examPreparingFor: {
+    type: String,
+  },
+  schoolOrCollegeName: {
+    type: String,
+  },
   idNumber: {
     type: Number,
     required: true,
     unique: true,
   },
   isActive: {
+    type: Boolean,
+    default: false,
+  },
+  // Adds ₹100/month when true (billing handled on client or separate service)
+  lockerService: {
     type: Boolean,
     default: false,
   },

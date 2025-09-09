@@ -97,15 +97,7 @@ export async function getSeatInfo(req, res) {
 
 export async function addSeat(req, res) {
   try {
-    const {
-      seatNumber,
-      studentName,
-      planName,
-      adharNumber,
-      age,
-      address,
-      idNumber,
-    } = req.body;
+    const { seatNumber } = req.body;
 
     // Simple validation: Check if seat number format is correct
     if (!validateSeatNumber(seatNumber)) {
@@ -115,52 +107,18 @@ export async function addSeat(req, res) {
       });
     }
 
-    // Check if seat number is already taken
-    const existingSeat = await User.findOne({seatNumber});
-    if (existingSeat) {
-      return res.status(400).json({
-        message: "Seat number already exists",
-      });
+    // Allow adding a seat placeholder only if no active user occupies it
+    const existingSeatUser = await User.findOne({ seatNumber, isActive: true });
+    if (existingSeatUser) {
+      return res.status(400).json({ message: "Seat number already exists" });
     }
-
-    // Check if Adhar number already exists
-    const existingUser = await User.findOne({adharNumber});
-    if (existingUser) {
-      return res.status(400).json({
-        message: "User with this Adhar number already exists",
-      });
-    }
-
-    // Find subscription plan
-    const subscriptionPlan = await SubscriptionPlan.findOne({planName});
-    if (!subscriptionPlan) {
-      return res.status(404).json({
-        message: "Subscription plan not found",
-      });
-    }
-
-    // Create new user with seat assignment
-    const newUser = new User({
-      name: studentName,
-      adharNumber,
-      subscriptionPlan: subscriptionPlan._id,
-      joiningDate: new Date(),
-      feePaid: false,
-      seatNumber,
-      age,
-      address,
-      idNumber,
-      isActive: true,
-    });
-
-    await newUser.save();
 
     res.json({
-      message: "Seat allocated successfully!",
+      message: "Seat added successfully!",
       seatNumber: seatNumber,
       section: getSectionFromSeat(seatNumber),
-      student: studentName,
-      plan: planName,
+      student: "Available",
+      plan: "-",
     });
   } catch (error) {
     console.error("Error allocating seat:", error);
