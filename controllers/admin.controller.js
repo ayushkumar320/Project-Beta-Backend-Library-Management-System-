@@ -542,3 +542,41 @@ export async function deleteStudent(req, res) {
     res.status(500).json({message: "Internal server error"});
   }
 }
+
+export async function deleteSubscriptionPlan(req, res) {
+  const {planId} = req.params;
+
+  // Validate planId
+  if (!mongoose.Types.ObjectId.isValid(planId)) {
+    return res.status(400).json({message: "Invalid plan ID format"});
+  }
+
+  try {
+    // Ensure database connection
+    await connectDB();
+
+    // Find the plan first
+    const plan = await SubscriptionPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({message: "Subscription plan not found"});
+    }
+
+    // Check if plan has active subscribers
+    if (plan.subscribers && plan.subscribers.length > 0) {
+      return res.status(400).json({
+        message: "Cannot delete plan with active subscribers. Please reassign or remove subscribers first.",
+      });
+    }
+
+    // Delete the plan
+    await SubscriptionPlan.findByIdAndDelete(planId);
+
+    res.json({
+      message: "Subscription plan deleted successfully",
+      planName: plan.planName,
+    });
+  } catch (error) {
+    console.error("Error deleting subscription plan:", error);
+    res.status(500).json({message: "Internal server error"});
+  }
+}

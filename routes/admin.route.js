@@ -7,6 +7,7 @@ import {
   updateStudent,
   deleteStudent,
   updateSubscriptionPlan,
+  deleteSubscriptionPlan,
   getSubscriptionPlans,
   getUsers,
   getDashboardCount,
@@ -30,6 +31,7 @@ router.post("/subscription", adminAuth, createSubscriptionPlan);
 router.put("/student/:adharNumber", adminAuth, updateStudent);
 router.delete("/student/:adharNumber", adminAuth, deleteStudent);
 router.put("/subscription", adminAuth, updateSubscriptionPlan);
+router.delete("/subscription/:planId", adminAuth, deleteSubscriptionPlan);
 router.get("/subscriptions", adminAuth, getSubscriptionPlans);
 router.get("/users", adminAuth, getUsers);
 router.get("/dashboard", getDashboardCount); // Temporarily remove auth for testing
