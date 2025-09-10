@@ -26,9 +26,9 @@ export async function initializeDefaultSeats(req, res) {
       for (let i = 1; i <= 39; i++) {
         defaultSeats.push({
           seatNumber: `B${i}`,
-          name: `Seat B${i}`,
           isActive: false, // Available by default
           joiningDate: new Date(),
+          // Don't set name for empty seats - will show as "Available"
         });
       }
 
@@ -180,10 +180,9 @@ export async function addSeat(req, res) {
     // Create a new seat record (inactive/available by default)
     const newSeat = new User({
       seatNumber: seatNumber,
-      name: `Seat ${seatNumber}`,
       isActive: false, // Available by default
       joiningDate: new Date(),
-      // Other fields will be filled when a student is assigned
+      // Don't set name for empty seats - will show as "Available"
     });
 
     await newSeat.save();
@@ -332,8 +331,16 @@ export async function getSeatManagement(req, res) {
 
     // Calculate dynamic seat statistics based on actual seats in database
     const totalSeats = validUsers.length;
-    const occupiedSeats = validUsers.filter((user) => user.isActive).length;
+    // A seat is occupied only if it has both isActive=true AND a name
+    const occupiedSeats = validUsers.filter((user) => user.isActive && user.name && user.name.trim() !== "").length;
     const availableSeats = totalSeats - occupiedSeats;
+
+    // Debug logging
+    console.log("Seat statistics debug:");
+    console.log("Total valid users:", totalSeats);
+    console.log("Users with isActive=true:", validUsers.filter(u => u.isActive).length);
+    console.log("Users with names:", validUsers.filter(u => u.name && u.name.trim() !== "").length);
+    console.log("Users with isActive=true AND names:", occupiedSeats);
 
     // Calculate section-wise dynamic statistics
     const sectionAUsers = validUsers.filter(
@@ -345,11 +352,11 @@ export async function getSeatManagement(req, res) {
 
     const sectionATotal = sectionAUsers.length;
     const sectionAOccupied = sectionAUsers.filter(
-      (user) => user.isActive
+      (user) => user.isActive && user.name && user.name.trim() !== ""
     ).length;
     const sectionBTotal = sectionBUsers.length;
     const sectionBOccupied = sectionBUsers.filter(
-      (user) => user.isActive
+      (user) => user.isActive && user.name && user.name.trim() !== ""
     ).length;
 
     // Prepare seat data for frontend (only valid seats)
@@ -384,15 +391,15 @@ export async function getSeatManagement(req, res) {
       return {
         seatNumber: user.seatNumber,
         section: getSectionFromSeat(user.seatNumber),
-        studentName: user.name || "Available",
+        studentName: (user.name && user.name.trim() !== "") ? user.name : "Available",
         plan: user.subscriptionPlan ? user.subscriptionPlan.planName : "-",
         joiningDate: user.joiningDate
           ? user.joiningDate.toISOString().split("T")[0]
           : "-",
         expirationDate: expirationDate || "-",
-        status: user.isActive ? "Occupied" : "Available",
+        status: (user.isActive && user.name && user.name.trim() !== "") ? "Occupied" : "Available",
         feePaid: user.feePaid || false,
-        students: user.isActive
+        students: (user.isActive && user.name && user.name.trim() !== "")
           ? [
               {
                 name: user.name,
