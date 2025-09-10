@@ -425,6 +425,9 @@ export async function getSeatManagement(req, res) {
     });
 
     res.json({
+      totalSeats,
+      occupiedSeats,
+      availableSeats,
       statistics: {
         totalSeats,
         occupiedSeats,
