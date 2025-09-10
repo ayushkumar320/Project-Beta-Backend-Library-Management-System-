@@ -3,9 +3,9 @@ import SubscriptionPlan from "../models/subscriptionPlan.model.js";
 
 // Simple utility functions for seat management
 function validateSeatNumber(seatNumber) {
-  // Simple validation: A1-A66 or B1-B99 (extended for more seats)
+  // Simple validation: A1-A66 or B1-B39
   const sectionARegex = /^A([1-9]|[1-5][0-9]|6[0-6])$/; // A1-A66
-  const sectionBRegex = /^B([1-9]|[1-8][0-9]|9[0-9])$/; // B1-B99
+  const sectionBRegex = /^B([1-9]|[1-2][0-9]|3[0-9])$/; // B1-B39
   return sectionARegex.test(seatNumber) || sectionBRegex.test(seatNumber);
 }
 
@@ -32,8 +32,8 @@ export async function getAvailableSeats(req, res) {
     }
 
     if (!section || section === "B") {
-      // Get available seats in Section B (B1 to B99)
-      for (let i = 1; i <= 99; i++) {
+      // Get available seats in Section B (B1 to B39)
+      for (let i = 1; i <= 39; i++) {
         const seatNumber = `B${i}`;
         const existingSeat = await User.findOne({seatNumber, isActive: true});
         if (!existingSeat) {
@@ -80,16 +80,22 @@ export async function getSeatInfo(req, res) {
       seatNumber: seatNumber,
       section: getSectionFromSeat(seatNumber),
       status: user.isActive ? "Occupied" : "Available",
-      students: user.isActive ? [{
-        name: user.name,
-        plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
-        joiningDate: user.joiningDate,
-        expiryDate: user.expiryDate,
-        feePaid: user.feePaid,
-        slot: user.slot,
-        fatherName: user.fatherName,
-        dateOfBirth: user.dateOfBirth,
-      }] : [],
+      students: user.isActive
+        ? [
+            {
+              name: user.name,
+              plan: user.subscriptionPlan
+                ? user.subscriptionPlan.planName
+                : null,
+              joiningDate: user.joiningDate,
+              expiryDate: user.expiryDate,
+              feePaid: user.feePaid,
+              slot: user.slot,
+              fatherName: user.fatherName,
+              dateOfBirth: user.dateOfBirth,
+            },
+          ]
+        : [],
     });
   } catch (error) {
     console.error("Error fetching seat information:", error);
@@ -99,20 +105,20 @@ export async function getSeatInfo(req, res) {
 
 export async function addSeat(req, res) {
   try {
-    const { seatNumber } = req.body;
+    const {seatNumber} = req.body;
 
     // Simple validation: Check if seat number format is correct
     if (!validateSeatNumber(seatNumber)) {
       return res.status(400).json({
         message:
-          "Invalid seat number. Use format A1-A66 for Section A or B1-B99 for Section B",
+          "Invalid seat number. Use format A1-A66 for Section A or B1-B39 for Section B",
       });
     }
 
     // Allow adding a seat placeholder only if no active user occupies it
-    const existingSeatUser = await User.findOne({ seatNumber, isActive: true });
+    const existingSeatUser = await User.findOne({seatNumber, isActive: true});
     if (existingSeatUser) {
-      return res.status(400).json({ message: "Seat number already exists" });
+      return res.status(400).json({message: "Seat number already exists"});
     }
 
     res.json({
@@ -132,7 +138,7 @@ export async function addSeat(req, res) {
 
 export async function deleteSeat(req, res) {
   try {
-    const { seatNumber } = req.params;
+    const {seatNumber} = req.params;
 
     // Simple validation: Check if seat number format is correct
     if (!validateSeatNumber(seatNumber)) {
@@ -142,10 +148,11 @@ export async function deleteSeat(req, res) {
     }
 
     // Check if seat is occupied by active user
-    const existingSeatUser = await User.findOne({ seatNumber, isActive: true });
+    const existingSeatUser = await User.findOne({seatNumber, isActive: true});
     if (existingSeatUser) {
-      return res.status(400).json({ 
-        message: "Cannot delete seat that is currently occupied by an active student" 
+      return res.status(400).json({
+        message:
+          "Cannot delete seat that is currently occupied by an active student",
       });
     }
 
@@ -311,16 +318,28 @@ export async function getSeatManagement(req, res) {
         expirationDate: expirationDate || "-",
         status: user.isActive ? "Occupied" : "Available",
         feePaid: user.feePaid || false,
-        students: user.isActive ? [{
-          name: user.name,
-          plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
-          joiningDate: user.joiningDate ? user.joiningDate.toISOString().split("T")[0] : null,
-          expiryDate: user.expiryDate ? user.expiryDate.toISOString().split("T")[0] : expirationDate,
-          feePaid: user.feePaid,
-          slot: user.slot,
-          fatherName: user.fatherName,
-          dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().split("T")[0] : null,
-        }] : [],
+        students: user.isActive
+          ? [
+              {
+                name: user.name,
+                plan: user.subscriptionPlan
+                  ? user.subscriptionPlan.planName
+                  : null,
+                joiningDate: user.joiningDate
+                  ? user.joiningDate.toISOString().split("T")[0]
+                  : null,
+                expiryDate: user.expiryDate
+                  ? user.expiryDate.toISOString().split("T")[0]
+                  : expirationDate,
+                feePaid: user.feePaid,
+                slot: user.slot,
+                fatherName: user.fatherName,
+                dateOfBirth: user.dateOfBirth
+                  ? user.dateOfBirth.toISOString().split("T")[0]
+                  : null,
+              },
+            ]
+          : [],
       };
     });
 
