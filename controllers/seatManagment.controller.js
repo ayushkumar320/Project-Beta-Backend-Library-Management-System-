@@ -563,13 +563,29 @@ export async function getSeatManagement(req, res) {
     const sectionBTotal = 39; // Section B has 39 seats (1-39)
     const totalSeats = sectionATotal + sectionBTotal; // 105 total seats
 
-    // Calculate occupied seats (only those with students assigned)
-    const sectionAOccupied = sectionAUsers.filter(
-      (user) => user.isActive && user.name && user.name.trim() !== ""
-    ).length;
-    const sectionBOccupied = sectionBUsers.filter(
-      (user) => user.isActive && user.name && user.name.trim() !== ""
-    ).length;
+    // Calculate occupied seats (count unique base seat numbers, not individual students)
+    const getBaseSeatNumber = (seatNumber) => {
+      // Extract base seat number (remove _2, _3, etc. suffixes)
+      return seatNumber.split('_')[0];
+    };
+
+    // Get unique base seat numbers for each section
+    const sectionABaseSeatNumbers = new Set();
+    const sectionBBaseSeatNumbers = new Set();
+
+    validUsers.forEach((user) => {
+      if (user.isActive && user.name && user.name.trim() !== "") {
+        const baseSeatNumber = getBaseSeatNumber(user.seatNumber);
+        if (baseSeatNumber.startsWith("A")) {
+          sectionABaseSeatNumbers.add(baseSeatNumber);
+        } else if (baseSeatNumber.startsWith("B")) {
+          sectionBBaseSeatNumbers.add(baseSeatNumber);
+        }
+      }
+    });
+
+    const sectionAOccupied = sectionABaseSeatNumbers.size;
+    const sectionBOccupied = sectionBBaseSeatNumbers.size;
     const occupiedSeats = sectionAOccupied + sectionBOccupied;
     const availableSeats = totalSeats - occupiedSeats;
 
@@ -596,73 +612,91 @@ export async function getSeatManagement(req, res) {
       availableSeats
     );
 
-    // Prepare seat data for frontend (only valid seats)
-    const seatData = validUsers.map((user) => {
-      let expirationDate = null;
+    // Group users by base seat number and prepare seat data
+    const seatMap = new Map();
+    const getBaseSeatNumber = (seatNumber) => {
+      return seatNumber.split('_')[0];
+    };
 
-      if (user.subscriptionPlan && user.joiningDate) {
-        // Calculate expiration date
-        const joiningDate = new Date(user.joiningDate);
-        const planDuration = user.subscriptionPlan.duration;
-        const durationLower = planDuration.toLowerCase();
-
-        let expDate = new Date(joiningDate);
-
-        if (durationLower.includes("day")) {
-          const days = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setDate(joiningDate.getDate() + days);
-        } else if (durationLower.includes("week")) {
-          const weeks = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setDate(joiningDate.getDate() + weeks * 7);
-        } else if (durationLower.includes("month")) {
-          const months = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setMonth(joiningDate.getMonth() + months);
-        } else if (durationLower.includes("year")) {
-          const years = parseInt(planDuration.match(/\d+/)[0]);
-          expDate.setFullYear(joiningDate.getFullYear() + years);
-        }
-
-        expirationDate = expDate.toISOString().split("T")[0];
+    // Group students by their base seat number
+    validUsers.forEach((user) => {
+      const baseSeatNumber = getBaseSeatNumber(user.seatNumber);
+      
+      if (!seatMap.has(baseSeatNumber)) {
+        seatMap.set(baseSeatNumber, {
+          seatNumber: baseSeatNumber,
+          section: getSectionFromSeat(baseSeatNumber),
+          students: [],
+          status: "Available",
+          feePaid: false,
+        });
       }
 
+      const seatInfo = seatMap.get(baseSeatNumber);
+      
+      // If this user is active and has a name, add them to the seat
+      if (user.isActive && user.name && user.name.trim() !== "") {
+        let expirationDate = null;
+
+        if (user.subscriptionPlan && user.joiningDate) {
+          // Calculate expiration date
+          const joiningDate = new Date(user.joiningDate);
+          const planDuration = user.subscriptionPlan.duration;
+          const durationLower = planDuration.toLowerCase();
+
+          let expDate = new Date(joiningDate);
+
+          if (durationLower.includes("day")) {
+            const days = parseInt(planDuration.match(/\d+/)[0]);
+            expDate.setDate(joiningDate.getDate() + days);
+          } else if (durationLower.includes("week")) {
+            const weeks = parseInt(planDuration.match(/\d+/)[0]);
+            expDate.setDate(joiningDate.getDate() + weeks * 7);
+          } else if (durationLower.includes("month")) {
+            const months = parseInt(planDuration.match(/\d+/)[0]);
+            expDate.setMonth(joiningDate.getMonth() + months);
+          } else if (durationLower.includes("year")) {
+            const years = parseInt(planDuration.match(/\d+/)[0]);
+            expDate.setFullYear(joiningDate.getFullYear() + years);
+          }
+
+          expirationDate = expDate.toISOString().split("T")[0];
+        }
+
+        seatInfo.students.push({
+          name: user.name,
+          plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
+          joiningDate: user.joiningDate
+            ? user.joiningDate.toISOString().split("T")[0]
+            : null,
+          expiryDate: user.expiryDate
+            ? user.expiryDate.toISOString().split("T")[0]
+            : expirationDate,
+          feePaid: user.feePaid,
+          slot: user.slot,
+          fatherName: user.fatherName,
+          dateOfBirth: user.dateOfBirth
+            ? user.dateOfBirth.toISOString().split("T")[0]
+            : null,
+        });
+
+        // Update seat status
+        seatInfo.status = "Occupied";
+        seatInfo.feePaid = seatInfo.feePaid || user.feePaid;
+      }
+    });
+
+    // Convert map to array and add additional seat properties
+    const seatData = Array.from(seatMap.values()).map(seat => {
+      // Set primary student name for display (first student or "Available")
+      const primaryStudent = seat.students.length > 0 ? seat.students[0] : null;
+      
       return {
-        seatNumber: user.seatNumber,
-        section: getSectionFromSeat(user.seatNumber),
-        studentName:
-          user.name && user.name.trim() !== "" ? user.name : "Available",
-        plan: user.subscriptionPlan ? user.subscriptionPlan.planName : "-",
-        joiningDate: user.joiningDate
-          ? user.joiningDate.toISOString().split("T")[0]
-          : "-",
-        expirationDate: expirationDate || "-",
-        status:
-          user.isActive && user.name && user.name.trim() !== ""
-            ? "Occupied"
-            : "Available",
-        feePaid: user.feePaid || false,
-        students:
-          user.isActive && user.name && user.name.trim() !== ""
-            ? [
-                {
-                  name: user.name,
-                  plan: user.subscriptionPlan
-                    ? user.subscriptionPlan.planName
-                    : null,
-                  joiningDate: user.joiningDate
-                    ? user.joiningDate.toISOString().split("T")[0]
-                    : null,
-                  expiryDate: user.expiryDate
-                    ? user.expiryDate.toISOString().split("T")[0]
-                    : expirationDate,
-                  feePaid: user.feePaid,
-                  slot: user.slot,
-                  fatherName: user.fatherName,
-                  dateOfBirth: user.dateOfBirth
-                    ? user.dateOfBirth.toISOString().split("T")[0]
-                    : null,
-                },
-              ]
-            : [],
+        ...seat,
+        studentName: primaryStudent ? primaryStudent.name : "Available",
+        plan: primaryStudent ? primaryStudent.plan : "-",
+        joiningDate: primaryStudent ? primaryStudent.joiningDate : "-",
+        expirationDate: primaryStudent ? primaryStudent.expiryDate : "-",
       };
     });
 
