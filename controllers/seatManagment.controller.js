@@ -329,28 +329,7 @@ export async function getSeatManagement(req, res) {
       validateSeatNumber(user.seatNumber)
     );
 
-    // Calculate dynamic seat statistics based on actual seats in database
-    const totalSeats = validUsers.length;
-    // A seat is occupied only if it has both isActive=true AND a name
-    const occupiedSeats = validUsers.filter(
-      (user) => user.isActive && user.name && user.name.trim() !== ""
-    ).length;
-    const availableSeats = totalSeats - occupiedSeats;
-
-    // Debug logging
-    console.log("Seat statistics debug:");
-    console.log("Total valid users:", totalSeats);
-    console.log(
-      "Users with isActive=true:",
-      validUsers.filter((u) => u.isActive).length
-    );
-    console.log(
-      "Users with names:",
-      validUsers.filter((u) => u.name && u.name.trim() !== "").length
-    );
-    console.log("Users with isActive=true AND names:", occupiedSeats);
-
-    // Calculate section-wise dynamic statistics
+    // Calculate section-wise statistics first
     const sectionAUsers = validUsers.filter(
       (user) => user.seatNumber && user.seatNumber.startsWith("A")
     );
@@ -358,14 +337,43 @@ export async function getSeatManagement(req, res) {
       (user) => user.seatNumber && user.seatNumber.startsWith("B")
     );
 
-    const sectionATotal = sectionAUsers.length;
+    // Calculate actual seat totals based on layout (not just database records)
+    const sectionATotal = 66; // Section A has 66 seats (1-66)
+    const sectionBTotal = 39; // Section B has 39 seats (1-39)
+    const totalSeats = sectionATotal + sectionBTotal; // 105 total seats
+
+    // Calculate occupied seats (only those with students assigned)
     const sectionAOccupied = sectionAUsers.filter(
       (user) => user.isActive && user.name && user.name.trim() !== ""
     ).length;
-    const sectionBTotal = sectionBUsers.length;
     const sectionBOccupied = sectionBUsers.filter(
       (user) => user.isActive && user.name && user.name.trim() !== ""
     ).length;
+    const occupiedSeats = sectionAOccupied + sectionBOccupied;
+    const availableSeats = totalSeats - occupiedSeats;
+
+    // Debug logging
+    console.log("Seat statistics debug:");
+    console.log(
+      "Section A - Total:",
+      sectionATotal,
+      "Occupied:",
+      sectionAOccupied
+    );
+    console.log(
+      "Section B - Total:",
+      sectionBTotal,
+      "Occupied:",
+      sectionBOccupied
+    );
+    console.log(
+      "Overall - Total:",
+      totalSeats,
+      "Occupied:",
+      occupiedSeats,
+      "Available:",
+      availableSeats
+    );
 
     // Prepare seat data for frontend (only valid seats)
     const seatData = validUsers.map((user) => {
