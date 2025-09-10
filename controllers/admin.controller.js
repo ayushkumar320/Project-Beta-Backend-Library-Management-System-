@@ -443,8 +443,28 @@ export async function getDashboardCount(req, res) {
     // Get total number of subscription plans
     const totalPlans = await SubscriptionPlan.countDocuments();
 
-    // Calculate available seats (assuming total capacity and occupied seats)
-    const occupiedSeats = await User.countDocuments({isActive: true});
+    // Calculate available seats using the same logic as seat management
+    // Get all active users and group them by base seat number
+    const activeUsersWithSeats = await User.find({
+      isActive: true,
+      seatNumber: {$exists: true},
+    });
+
+    const getBaseSeatNumber = (seatNumber) => {
+      // Extract base seat number (remove _2, _3, etc. suffixes)
+      return seatNumber.split("_")[0];
+    };
+
+    // Get unique base seat numbers
+    const occupiedBaseSeatNumbers = new Set();
+    activeUsersWithSeats.forEach((user) => {
+      if (user.seatNumber && user.name && user.name.trim() !== "") {
+        const baseSeatNumber = getBaseSeatNumber(user.seatNumber);
+        occupiedBaseSeatNumbers.add(baseSeatNumber);
+      }
+    });
+
+    const occupiedSeats = occupiedBaseSeatNumbers.size;
     // Total capacity: Section A (66) + Section B (39) = 105 seats
     const totalCapacity = 105;
     const availableSeats = totalCapacity - occupiedSeats;
