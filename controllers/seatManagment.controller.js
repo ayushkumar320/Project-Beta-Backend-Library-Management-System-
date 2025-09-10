@@ -332,14 +332,22 @@ export async function getSeatManagement(req, res) {
     // Calculate dynamic seat statistics based on actual seats in database
     const totalSeats = validUsers.length;
     // A seat is occupied only if it has both isActive=true AND a name
-    const occupiedSeats = validUsers.filter((user) => user.isActive && user.name && user.name.trim() !== "").length;
+    const occupiedSeats = validUsers.filter(
+      (user) => user.isActive && user.name && user.name.trim() !== ""
+    ).length;
     const availableSeats = totalSeats - occupiedSeats;
 
     // Debug logging
     console.log("Seat statistics debug:");
     console.log("Total valid users:", totalSeats);
-    console.log("Users with isActive=true:", validUsers.filter(u => u.isActive).length);
-    console.log("Users with names:", validUsers.filter(u => u.name && u.name.trim() !== "").length);
+    console.log(
+      "Users with isActive=true:",
+      validUsers.filter((u) => u.isActive).length
+    );
+    console.log(
+      "Users with names:",
+      validUsers.filter((u) => u.name && u.name.trim() !== "").length
+    );
     console.log("Users with isActive=true AND names:", occupiedSeats);
 
     // Calculate section-wise dynamic statistics
@@ -391,36 +399,41 @@ export async function getSeatManagement(req, res) {
       return {
         seatNumber: user.seatNumber,
         section: getSectionFromSeat(user.seatNumber),
-        studentName: (user.name && user.name.trim() !== "") ? user.name : "Available",
+        studentName:
+          user.name && user.name.trim() !== "" ? user.name : "Available",
         plan: user.subscriptionPlan ? user.subscriptionPlan.planName : "-",
         joiningDate: user.joiningDate
           ? user.joiningDate.toISOString().split("T")[0]
           : "-",
         expirationDate: expirationDate || "-",
-        status: (user.isActive && user.name && user.name.trim() !== "") ? "Occupied" : "Available",
+        status:
+          user.isActive && user.name && user.name.trim() !== ""
+            ? "Occupied"
+            : "Available",
         feePaid: user.feePaid || false,
-        students: (user.isActive && user.name && user.name.trim() !== "")
-          ? [
-              {
-                name: user.name,
-                plan: user.subscriptionPlan
-                  ? user.subscriptionPlan.planName
-                  : null,
-                joiningDate: user.joiningDate
-                  ? user.joiningDate.toISOString().split("T")[0]
-                  : null,
-                expiryDate: user.expiryDate
-                  ? user.expiryDate.toISOString().split("T")[0]
-                  : expirationDate,
-                feePaid: user.feePaid,
-                slot: user.slot,
-                fatherName: user.fatherName,
-                dateOfBirth: user.dateOfBirth
-                  ? user.dateOfBirth.toISOString().split("T")[0]
-                  : null,
-              },
-            ]
-          : [],
+        students:
+          user.isActive && user.name && user.name.trim() !== ""
+            ? [
+                {
+                  name: user.name,
+                  plan: user.subscriptionPlan
+                    ? user.subscriptionPlan.planName
+                    : null,
+                  joiningDate: user.joiningDate
+                    ? user.joiningDate.toISOString().split("T")[0]
+                    : null,
+                  expiryDate: user.expiryDate
+                    ? user.expiryDate.toISOString().split("T")[0]
+                    : expirationDate,
+                  feePaid: user.feePaid,
+                  slot: user.slot,
+                  fatherName: user.fatherName,
+                  dateOfBirth: user.dateOfBirth
+                    ? user.dateOfBirth.toISOString().split("T")[0]
+                    : null,
+                },
+              ]
+            : [],
       };
     });
 
