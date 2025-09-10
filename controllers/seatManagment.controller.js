@@ -3,10 +3,9 @@ import SubscriptionPlan from "../models/subscriptionPlan.model.js";
 
 // Simple utility functions for seat management
 function validateSeatNumber(seatNumber) {
-  // Simple validation: A1-A66 or B1-B39
-  const sectionARegex = /^A([1-9]|[1-5][0-9]|6[0-6])$/; // A1-A66
-  const sectionBRegex = /^B([1-9]|[1-2][0-9]|3[0-9])$/; // B1-B39
-  return sectionARegex.test(seatNumber) || sectionBRegex.test(seatNumber);
+  // Dynamic validation: Any positive number for sections A or B
+  const sectionRegex = /^[AB]([1-9]\d*)$/; // A1+, B1+ (any positive number)
+  return sectionRegex.test(seatNumber);
 }
 
 function getSectionFromSeat(seatNumber) {
@@ -20,11 +19,24 @@ export async function getAvailableSeats(req, res) {
 
     let availableSeats = [];
 
+    // Get all existing seats from database to determine the range dynamically
+    const allSeats = await User.find({}, "seatNumber isActive");
+
     if (!section || section === "A") {
-      // Get available seats in Section A (A1 to A66)
-      for (let i = 1; i <= 66; i++) {
+      // Find max seat number for Section A
+      const sectionASeats = allSeats
+        .filter((seat) => seat.seatNumber && seat.seatNumber.startsWith("A"))
+        .map((seat) => parseInt(seat.seatNumber.substring(1)))
+        .filter((num) => !isNaN(num));
+
+      const maxA = sectionASeats.length > 0 ? Math.max(...sectionASeats) : 0;
+
+      // Get available seats in Section A up to the maximum found
+      for (let i = 1; i <= maxA; i++) {
         const seatNumber = `A${i}`;
-        const existingSeat = await User.findOne({seatNumber, isActive: true});
+        const existingSeat = allSeats.find(
+          (seat) => seat.seatNumber === seatNumber && seat.isActive
+        );
         if (!existingSeat) {
           availableSeats.push(seatNumber);
         }
@@ -32,10 +44,20 @@ export async function getAvailableSeats(req, res) {
     }
 
     if (!section || section === "B") {
-      // Get available seats in Section B (B1 to B39)
-      for (let i = 1; i <= 39; i++) {
+      // Find max seat number for Section B
+      const sectionBSeats = allSeats
+        .filter((seat) => seat.seatNumber && seat.seatNumber.startsWith("B"))
+        .map((seat) => parseInt(seat.seatNumber.substring(1)))
+        .filter((num) => !isNaN(num));
+
+      const maxB = sectionBSeats.length > 0 ? Math.max(...sectionBSeats) : 0;
+
+      // Get available seats in Section B up to the maximum found
+      for (let i = 1; i <= maxB; i++) {
         const seatNumber = `B${i}`;
-        const existingSeat = await User.findOne({seatNumber, isActive: true});
+        const existingSeat = allSeats.find(
+          (seat) => seat.seatNumber === seatNumber && seat.isActive
+        );
         if (!existingSeat) {
           availableSeats.push(seatNumber);
         }
@@ -111,7 +133,7 @@ export async function addSeat(req, res) {
     if (!validateSeatNumber(seatNumber)) {
       return res.status(400).json({
         message:
-          "Invalid seat number. Use format A1-A66 for Section A or B1-B39 for Section B",
+          "Invalid seat number. Use format A{number} for Section A or B{number} for Section B (e.g., A1, B1, A100, B50)",
       });
     }
 
