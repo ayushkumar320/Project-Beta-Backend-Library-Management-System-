@@ -23,6 +23,8 @@ import {
   getSeatInfo,
   cleanupInvalidSeats,
   initializeDefaultSeats,
+  addStudentToSeat,
+  getStudentsInSeat,
 } from "../controllers/seatManagment.controller.js";
 
 const router = express.Router();
@@ -47,5 +49,9 @@ router.get("/seats/available", adminAuth, getAvailableSeats);
 router.get("/seat/:seatNumber", adminAuth, getSeatInfo);
 router.get("/seats/cleanup", adminAuth, cleanupInvalidSeats);
 router.post("/seats/initialize", adminAuth, initializeDefaultSeats);
+
+// New routes for multiple students per seat
+router.post("/seat/:seatNumber/add-student", adminAuth, addStudentToSeat);
+router.get("/seat/:seatNumber/students", adminAuth, getStudentsInSeat);
 
 export default router;

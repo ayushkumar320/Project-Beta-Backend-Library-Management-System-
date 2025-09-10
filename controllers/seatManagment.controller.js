@@ -236,12 +236,243 @@ export async function deleteSeat(req, res) {
   }
 }
 
+// Add multiple students to the same seat (for shared/slot-based seating)
+export async function addStudentToSeat(req, res) {
+  try {
+    const seatNumber = req.params.seatNumber;
+    const {studentName, planName, adharNumber, slot, feePaid} = req.body;
+
+    if (!studentName || !planName || !adharNumber) {
+      return res.status(400).json({
+        message: "Student name, plan name, and Aadhar number are required",
+      });
+    }
+
+    // Check if student already exists
+    const existingStudent = await User.findOne({adharNumber});
+    if (existingStudent) {
+      return res.status(400).json({
+        message: "Student with this Aadhar number already exists",
+        existingStudent: {
+          name: existingStudent.name,
+          seatNumber: existingStudent.seatNumber,
+        },
+      });
+    }
+
+    // Find subscription plan
+    const subscriptionPlan = await SubscriptionPlan.findOne({planName});
+    if (!subscriptionPlan) {
+      return res.status(404).json({
+        message: "Subscription plan not found",
+      });
+    }
+
+    // Check how many students are already in this seat
+    const studentsInSeat = await User.find({
+      seatNumber: {$regex: `^${seatNumber}($|_)`}, // Match exact seat or with suffix
+    });
+
+    // Create unique seat identifier for multiple students
+    const seatIdentifier =
+      studentsInSeat.length === 0
+        ? seatNumber
+        : `${seatNumber}_${studentsInSeat.length + 1}`;
+
+    // Create new student
+    const newStudent = new User({
+      name: studentName,
+      adharNumber: adharNumber,
+      seatNumber: seatIdentifier,
+      subscriptionPlan: subscriptionPlan._id,
+      slot: slot || "Full day",
+      isActive: true,
+      feePaid: feePaid || false,
+      joiningDate: new Date(),
+    });
+
+    await newStudent.save();
+    await newStudent.populate("subscriptionPlan", "planName duration");
+
+    // Get all students in this seat for response
+    const allStudentsInSeat = await User.find({
+      seatNumber: {$regex: `^${seatNumber}($|_)`},
+    }).populate("subscriptionPlan", "planName duration");
+
+    res.json({
+      message: "Student added to seat successfully!",
+      seatNumber: seatNumber,
+      newStudent: {
+        name: newStudent.name,
+        plan: newStudent.subscriptionPlan.planName,
+        slot: newStudent.slot,
+        adharNumber: newStudent.adharNumber,
+        feePaid: newStudent.feePaid,
+        joiningDate: newStudent.joiningDate.toISOString().split("T")[0],
+      },
+      totalStudentsInSeat: allStudentsInSeat.length,
+      allStudents: allStudentsInSeat.map((student) => ({
+        name: student.name,
+        slot: student.slot,
+        plan: student.subscriptionPlan?.planName || "-",
+        adharNumber: student.adharNumber,
+      })),
+    });
+  } catch (error) {
+    console.error("Error adding student to seat:", error);
+    if (error.code === 11000) {
+      if (error.keyPattern?.adharNumber) {
+        return res.status(400).json({
+          message: "Student with this Aadhar number already exists",
+        });
+      }
+    }
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+}
+
+// Get all students in a specific seat
+export async function getStudentsInSeat(req, res) {
+  try {
+    const seatNumber = req.params.seatNumber;
+
+    // Find all students in this seat (including variations with suffixes)
+    const studentsInSeat = await User.find({
+      seatNumber: {$regex: `^${seatNumber}($|_)`},
+    }).populate("subscriptionPlan", "planName duration");
+
+    if (studentsInSeat.length === 0) {
+      return res.json({
+        seatNumber: seatNumber,
+        status: "Available",
+        students: [],
+        totalStudents: 0,
+      });
+    }
+
+    const studentsData = studentsInSeat.map((student) => ({
+      id: student._id,
+      name: student.name,
+      adharNumber: student.adharNumber,
+      slot: student.slot,
+      plan: student.subscriptionPlan?.planName || "-",
+      isActive: student.isActive,
+      feePaid: student.feePaid,
+      joiningDate: student.joiningDate
+        ? student.joiningDate.toISOString().split("T")[0]
+        : "-",
+      expiryDate: student.expiryDate
+        ? student.expiryDate.toISOString().split("T")[0]
+        : "-",
+    }));
+
+    res.json({
+      seatNumber: seatNumber,
+      status: "Occupied",
+      students: studentsData,
+      totalStudents: studentsInSeat.length,
+    });
+  } catch (error) {
+    console.error("Error getting students in seat:", error);
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+}
+
 export async function updateSeat(req, res) {
   try {
     const seatNumber = req.params.seatNumber;
-    const {studentName, planName, isActive, feePaid} = req.body;
+    const {studentName, planName, isActive, feePaid, adharNumber, slot} =
+      req.body;
 
-    // First check if seat exists
+    if (studentName && planName && adharNumber) {
+      // Adding/updating a student - check if student already exists anywhere
+      const existingStudent = await User.findOne({adharNumber});
+      if (existingStudent) {
+        // Student exists, update their seat assignment
+        const subscriptionPlan = await SubscriptionPlan.findOne({planName});
+        if (!subscriptionPlan) {
+          return res.status(404).json({
+            message: "Subscription plan not found",
+          });
+        }
+
+        const updateData = {
+          name: studentName,
+          seatNumber: seatNumber,
+          subscriptionPlan: subscriptionPlan._id,
+          slot: slot || existingStudent.slot || "Full day",
+          isActive: isActive !== undefined ? isActive : true,
+          feePaid: feePaid !== undefined ? feePaid : false,
+          joiningDate: new Date(),
+        };
+
+        const updatedUser = await User.findOneAndUpdate(
+          {adharNumber},
+          updateData,
+          {new: true}
+        ).populate("subscriptionPlan", "planName duration");
+
+        return res.json({
+          message: "Student seat updated successfully!",
+          seatNumber: seatNumber,
+          student: updatedUser.name,
+          plan: updatedUser.subscriptionPlan.planName,
+          slot: updatedUser.slot,
+          status: "Occupied",
+          feePaid: updatedUser.feePaid,
+          joiningDate: updatedUser.joiningDate.toISOString().split("T")[0],
+        });
+      } else {
+        // New student - check if seat is already occupied
+        const seatOccupant = await User.findOne({seatNumber, isActive: true});
+        if (seatOccupant) {
+          return res.status(400).json({
+            message:
+              "Seat is already occupied by another student. Please choose a different seat or remove the existing student first.",
+            occupiedBy: seatOccupant.name,
+          });
+        }
+
+        // Create new student
+        const subscriptionPlan = await SubscriptionPlan.findOne({planName});
+        if (!subscriptionPlan) {
+          return res.status(404).json({
+            message: "Subscription plan not found",
+          });
+        }
+
+        const newStudent = new User({
+          name: studentName,
+          adharNumber: adharNumber,
+          seatNumber: seatNumber,
+          subscriptionPlan: subscriptionPlan._id,
+          slot: slot || "Full day",
+          isActive: isActive !== undefined ? isActive : true,
+          feePaid: feePaid !== undefined ? feePaid : false,
+          joiningDate: new Date(),
+        });
+
+        await newStudent.save();
+        await newStudent.populate("subscriptionPlan", "planName duration");
+
+        return res.json({
+          message: "Student assigned to seat successfully!",
+          seatNumber: seatNumber,
+          student: newStudent.name,
+          plan: newStudent.subscriptionPlan.planName,
+          slot: newStudent.slot,
+          status: "Occupied",
+          feePaid: newStudent.feePaid,
+          joiningDate: newStudent.joiningDate.toISOString().split("T")[0],
+        });
+      }
+    }
+
+    // Handle status updates for existing seat
     const existingUser = await User.findOne({seatNumber});
     if (!existingUser) {
       return res.status(404).json({
@@ -250,48 +481,21 @@ export async function updateSeat(req, res) {
     }
 
     let updateData = {};
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (feePaid !== undefined) {
+      updateData.feePaid = feePaid;
+    }
 
-    if (studentName && planName) {
-      // If assigning a new student to the seat
-      const subscriptionPlan = await SubscriptionPlan.findOne({planName});
-      if (!subscriptionPlan) {
-        return res.status(404).json({
-          message: "Subscription plan not found",
-        });
-      }
-
-      // Prepare update data for new student assignment
-      updateData = {
-        name: studentName,
-        subscriptionPlan: subscriptionPlan._id,
-        isActive: isActive !== undefined ? isActive : true,
-        feePaid: feePaid !== undefined ? feePaid : false,
-        joiningDate: new Date(),
-      };
-    } else if (isActive !== undefined) {
-      // Update seat status
-      updateData = {
-        isActive: isActive,
-        feePaid: feePaid !== undefined ? feePaid : existingUser.feePaid,
-      };
-
-      // If making seat available (isActive = false), don't clear the user data
-      // The seat will show as "Available" in the response but keep user history
-    } else if (feePaid !== undefined) {
-      // Only updating fee status
-      updateData = {
-        feePaid: feePaid,
-      };
-    } else {
+    if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         message: "No valid update data provided",
       });
     }
 
-    // Update using findOneAndUpdate
     const updatedUser = await User.findOneAndUpdate({seatNumber}, updateData, {
       new: true,
-      runValidators: true,
     }).populate("subscriptionPlan", "planName duration");
 
     res.json({
@@ -309,6 +513,19 @@ export async function updateSeat(req, res) {
     });
   } catch (error) {
     console.error("Error updating seat:", error);
+    if (error.code === 11000) {
+      // Handle duplicate key errors
+      if (error.keyPattern?.seatNumber) {
+        return res.status(400).json({
+          message: "Seat is already occupied. Please choose a different seat.",
+        });
+      }
+      if (error.keyPattern?.adharNumber) {
+        return res.status(400).json({
+          message: "Student with this Aadhar number already exists.",
+        });
+      }
+    }
     res.status(500).json({
       message: "Internal server error",
     });
