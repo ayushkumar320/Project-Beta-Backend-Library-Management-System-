@@ -119,11 +119,12 @@ export async function getSeatInfo(req, res) {
       });
     }
 
-    const user = await User.findOne({seatNumber})
-      .populate("subscriptionPlan", "planName duration")
-      .exec();
+    // Find all students in this seat (including variations with suffixes)
+    const studentsInSeat = await User.find({
+      seatNumber: {$regex: `^${seatNumber}($|_)`},
+    }).populate("subscriptionPlan", "planName duration");
 
-    if (!user) {
+    if (studentsInSeat.length === 0) {
       return res.json({
         seatNumber: seatNumber,
         section: getSectionFromSeat(seatNumber),
@@ -132,26 +133,29 @@ export async function getSeatInfo(req, res) {
       });
     }
 
+    // Map all students to the required format
+    const studentsData = studentsInSeat.map((user) => ({
+      name: user.name,
+      plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
+      joiningDate: user.joiningDate,
+      expiryDate: user.expiryDate,
+      feePaid: user.feePaid,
+      slot: user.slot,
+      fatherName: user.fatherName,
+      dateOfBirth: user.dateOfBirth,
+      adharNumber: user.adharNumber,
+      idNumber: user.idNumber,
+      isActive: user.isActive,
+    }));
+
+    // Check if any student is active to determine seat status
+    const hasActiveStudent = studentsInSeat.some((user) => user.isActive);
+
     res.json({
       seatNumber: seatNumber,
       section: getSectionFromSeat(seatNumber),
-      status: user.isActive ? "Occupied" : "Available",
-      students: user.isActive
-        ? [
-            {
-              name: user.name,
-              plan: user.subscriptionPlan
-                ? user.subscriptionPlan.planName
-                : null,
-              joiningDate: user.joiningDate,
-              expiryDate: user.expiryDate,
-              feePaid: user.feePaid,
-              slot: user.slot,
-              fatherName: user.fatherName,
-              dateOfBirth: user.dateOfBirth,
-            },
-          ]
-        : [],
+      status: hasActiveStudent ? "Occupied" : "Available",
+      students: studentsData,
     });
   } catch (error) {
     console.error("Error fetching seat information:", error);
