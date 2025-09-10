@@ -25,6 +25,9 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  expiryDate: {
+    type: Date,
+  },
   feePaid: {
     type: Boolean,
     default: false,
@@ -34,8 +37,11 @@ const UserSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  age: {
-    type: Number,
+  dateOfBirth: {
+    type: Date,
+  },
+  fatherName: {
+    type: String,
   },
   address: {
     type: String,

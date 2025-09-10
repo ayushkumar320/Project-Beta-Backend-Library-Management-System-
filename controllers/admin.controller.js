@@ -54,7 +54,8 @@ export async function registerUser(req, res) {
     joiningDate,
     feePaid,
     seatNumber,
-    age,
+    dateOfBirth,
+    fatherName,
     address,
     examPreparingFor,
     schoolOrCollegeName,
@@ -143,8 +144,11 @@ export async function registerUser(req, res) {
     if (feePaid !== undefined) {
       userData.feePaid = Boolean(feePaid);
     }
-    if (age !== undefined) {
-      userData.age = parseInt(age);
+    if (dateOfBirth) {
+      userData.dateOfBirth = new Date(dateOfBirth);
+    }
+    if (fatherName) {
+      userData.fatherName = fatherName;
     }
     if (address) {
       userData.address = address;
@@ -164,6 +168,31 @@ export async function registerUser(req, res) {
 
     const user = new User(userData);
     await user.save();
+
+    // Calculate expiry date based on subscription plan
+    if (subscriptionPlan && planExists) {
+      const joiningDate = userData.joiningDate || new Date();
+      const planDuration = planExists.duration;
+      let expiryDate = new Date(joiningDate);
+      const durationLower = planDuration.toLowerCase();
+
+      if (durationLower.includes("day")) {
+        const days = parseInt(planDuration.match(/\d+/)[0]);
+        expiryDate.setDate(joiningDate.getDate() + days);
+      } else if (durationLower.includes("week")) {
+        const weeks = parseInt(planDuration.match(/\d+/)[0]);
+        expiryDate.setDate(joiningDate.getDate() + weeks * 7);
+      } else if (durationLower.includes("month")) {
+        const months = parseInt(planDuration.match(/\d+/)[0]);
+        expiryDate.setMonth(joiningDate.getMonth() + months);
+      } else if (durationLower.includes("year")) {
+        const years = parseInt(planDuration.match(/\d+/)[0]);
+        expiryDate.setFullYear(joiningDate.getFullYear() + years);
+      }
+
+      // Update user with expiry date
+      await User.findByIdAndUpdate(user._id, { expiryDate });
+    }
 
     // Add user to the subscription plan's subscribers list
     if (subscriptionPlan) {
@@ -222,7 +251,8 @@ export async function updateStudent(req, res) {
     joiningDate,
     feePaid,
     seatNumber,
-    age,
+    dateOfBirth,
+    fatherName,
     address,
     examPreparingFor,
     schoolOrCollegeName,
@@ -277,7 +307,8 @@ export async function updateStudent(req, res) {
         joiningDate,
         feePaid,
         seatNumber,
-        age,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+        fatherName,
         address,
         examPreparingFor,
         schoolOrCollegeName,
@@ -326,29 +357,16 @@ export async function updateStudent(req, res) {
 }
 
 export async function updateSubscriptionPlan(req, res) {
-  const {planId, _id, planName, price, duration, subscribers, status} = req.body;
+  const {planName, price, duration, subscribers, status} = req.body;
 
   try {
     // Ensure database connection
     await connectDB();
-    let updatedPlan = null;
-
-    // Prefer updating by id if provided
-    const id = planId || _id;
-    if (id && mongoose.Types.ObjectId.isValid(id)) {
-      const updateFields = {price, duration, subscribers, status};
-      if (planName) updateFields.planName = planName;
-      updatedPlan = await SubscriptionPlan.findByIdAndUpdate(id, updateFields, {
-        new: true,
-      });
-    } else if (planName) {
-      // Fallback: update by current planName (legacy behavior)
-      updatedPlan = await SubscriptionPlan.findOneAndUpdate(
-        {planName},
-        {price, duration, subscribers, status},
-        {new: true}
-      );
-    }
+    const updatedPlan = await SubscriptionPlan.findOneAndUpdate(
+      {planName},
+      {price, duration, subscribers, status},
+      {new: true}
+    );
 
     if (!updatedPlan) {
       return res.status(404).json({message: "Subscription plan not found"});

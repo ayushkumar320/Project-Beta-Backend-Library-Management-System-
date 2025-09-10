@@ -6,15 +6,43 @@ const SeatManegmentSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  students: [{
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    plan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubscriptionPlan",
+      required: true,
+    },
+    slot: {
+      type: String,
+      enum: ["Morning", "Evening", "Full day", "24 Hour", "Short Slot"],
+      required: true,
+    },
+    allocationDate: {
+      type: Date,
+      default: Date.now,
+    },
+    expirationDate: {
+      type: Date,
+      required: true,
+    },
+    status: {
+      type: Boolean,
+      default: true,
+    },
+  }],
+  // Keep legacy fields for backward compatibility
   student: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
   },
   plan: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "SubscriptionPlan",
-    required: true,
   },
   allocationDate: {
     type: Date,
@@ -22,7 +50,6 @@ const SeatManegmentSchema = new mongoose.Schema({
   },
   expirationDate: {
     type: Date,
-    required: true,
   },
   status: {
     type: Boolean,

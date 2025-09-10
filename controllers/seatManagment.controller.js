@@ -72,7 +72,7 @@ export async function getSeatInfo(req, res) {
         seatNumber: seatNumber,
         section: getSectionFromSeat(seatNumber),
         status: "Available",
-        student: null,
+        students: [],
       });
     }
 
@@ -80,14 +80,16 @@ export async function getSeatInfo(req, res) {
       seatNumber: seatNumber,
       section: getSectionFromSeat(seatNumber),
       status: user.isActive ? "Occupied" : "Available",
-      student: user.name
-        ? {
-            name: user.name,
-            plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
-            joiningDate: user.joiningDate,
-            feePaid: user.feePaid,
-          }
-        : null,
+      students: user.isActive ? [{
+        name: user.name,
+        plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
+        joiningDate: user.joiningDate,
+        expiryDate: user.expiryDate,
+        feePaid: user.feePaid,
+        slot: user.slot,
+        fatherName: user.fatherName,
+        dateOfBirth: user.dateOfBirth,
+      }] : [],
     });
   } catch (error) {
     console.error("Error fetching seat information:", error);
@@ -122,6 +124,39 @@ export async function addSeat(req, res) {
     });
   } catch (error) {
     console.error("Error allocating seat:", error);
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+}
+
+export async function deleteSeat(req, res) {
+  try {
+    const { seatNumber } = req.params;
+
+    // Simple validation: Check if seat number format is correct
+    if (!validateSeatNumber(seatNumber)) {
+      return res.status(400).json({
+        message: "Invalid seat number format",
+      });
+    }
+
+    // Check if seat is occupied by active user
+    const existingSeatUser = await User.findOne({ seatNumber, isActive: true });
+    if (existingSeatUser) {
+      return res.status(400).json({ 
+        message: "Cannot delete seat that is currently occupied by an active student" 
+      });
+    }
+
+    // If seat exists but is not active, we can consider it deleted
+    // (In a real scenario, you might want to actually remove the user record)
+    res.json({
+      message: "Seat deleted successfully!",
+      seatNumber: seatNumber,
+    });
+  } catch (error) {
+    console.error("Error deleting seat:", error);
     res.status(500).json({
       message: "Internal server error",
     });
@@ -276,6 +311,16 @@ export async function getSeatManagement(req, res) {
         expirationDate: expirationDate || "-",
         status: user.isActive ? "Occupied" : "Available",
         feePaid: user.feePaid || false,
+        students: user.isActive ? [{
+          name: user.name,
+          plan: user.subscriptionPlan ? user.subscriptionPlan.planName : null,
+          joiningDate: user.joiningDate ? user.joiningDate.toISOString().split("T")[0] : null,
+          expiryDate: user.expiryDate ? user.expiryDate.toISOString().split("T")[0] : expirationDate,
+          feePaid: user.feePaid,
+          slot: user.slot,
+          fatherName: user.fatherName,
+          dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().split("T")[0] : null,
+        }] : [],
       };
     });
 

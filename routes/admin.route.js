@@ -17,6 +17,7 @@ import {
 import {
   addSeat,
   updateSeat,
+  deleteSeat,
   getSeatManagement,
   getAvailableSeats,
   getSeatInfo,
@@ -39,6 +40,7 @@ router.get("/subscription-ending", adminAuth, getSubscriptionEndingPlan);
 
 router.post("/seat", adminAuth, addSeat);
 router.put("/seat/:seatNumber", adminAuth, updateSeat);
+router.delete("/seat/:seatNumber", adminAuth, deleteSeat);
 router.get("/seats", adminAuth, getSeatManagement);
 router.get("/seats/available", adminAuth, getAvailableSeats);
 router.get("/seat/:seatNumber", adminAuth, getSeatInfo);
