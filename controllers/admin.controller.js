@@ -107,13 +107,11 @@ export async function registerUser(req, res) {
       });
     }
 
+    // Check for duplicate Aadhar and ID numbers (but allow multiple students per seat)
     const existingUser = await User.findOne({
-      $or: [
-        {adharNumber: adharNumberAsNumber},
-        {idNumber: idNumberAsNumber},
-        {seatNumber},
-      ],
+      $or: [{adharNumber: adharNumberAsNumber}, {idNumber: idNumberAsNumber}],
     });
+
     if (existingUser) {
       if (existingUser.adharNumber === adharNumberAsNumber) {
         return res
@@ -123,17 +121,27 @@ export async function registerUser(req, res) {
         return res
           .status(400)
           .json({message: "User with this ID number already exists"});
-      } else if (existingUser.seatNumber === seatNumber) {
-        return res.status(400).json({message: "This seat is already occupied"});
       }
     }
+
+    // Check how many students are already in this seat
+    const studentsInSeat = await User.find({
+      seatNumber: {$regex: `^${seatNumber}($|_)`}, // Match exact seat or with suffix
+    });
+
+    // Create unique seat identifier for multiple students
+    const seatIdentifier =
+      studentsInSeat.length === 0
+        ? seatNumber
+        : `${seatNumber}_${studentsInSeat.length + 1}`;
+
     // Prepare user data with proper types and defaults
     const userData = {
       name,
       slot,
       adharNumber: adharNumberAsNumber,
       subscriptionPlan,
-      seatNumber,
+      seatNumber: seatIdentifier, // Use the unique seat identifier
       idNumber: idNumberAsNumber,
     };
 
@@ -191,7 +199,7 @@ export async function registerUser(req, res) {
       }
 
       // Update user with expiry date
-      await User.findByIdAndUpdate(user._id, { expiryDate });
+      await User.findByIdAndUpdate(user._id, {expiryDate});
     }
 
     // Add user to the subscription plan's subscribers list
@@ -203,7 +211,20 @@ export async function registerUser(req, res) {
       );
     }
 
-    res.status(201).json({message: "User registered successfully"});
+    // Get total students in this seat for response
+    const totalStudentsInSeat = await User.find({
+      seatNumber: {$regex: `^${seatNumber}($|_)`},
+    }).countDocuments();
+
+    res.status(201).json({
+      message: "User registered successfully",
+      student: {
+        name: user.name,
+        seatNumber: seatNumber, // Show the base seat number
+        slot: user.slot,
+        totalStudentsInSeat: totalStudentsInSeat,
+      },
+    });
   } catch (error) {
     console.error("Error registering user:", error);
     res.status(500).json({message: "Internal server error"});
@@ -285,7 +306,8 @@ export async function updateStudent(req, res) {
       const planExists = await SubscriptionPlan.findById(subscriptionPlan);
       if (!planExists) {
         return res.status(400).json({
-          message: "Subscription plan not found. Please provide a valid plan ID.",
+          message:
+            "Subscription plan not found. Please provide a valid plan ID.",
         });
       }
     }
@@ -617,7 +639,8 @@ export async function deleteSubscriptionPlan(req, res) {
     // Check if plan has active subscribers
     if (plan.subscribers && plan.subscribers.length > 0) {
       return res.status(400).json({
-        message: "Cannot delete plan with active subscribers. Please reassign or remove subscribers first.",
+        message:
+          "Cannot delete plan with active subscribers. Please reassign or remove subscribers first.",
       });
     }
 
