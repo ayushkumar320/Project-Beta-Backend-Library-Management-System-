@@ -3,9 +3,9 @@ import SubscriptionPlan from "../models/subscriptionPlan.model.js";
 
 // Simple utility functions for seat management
 function validateSeatNumber(seatNumber) {
-  // Simple validation: A1-A66 or B1-B39
+  // Simple validation: A1-A66 or B1-B99 (extended for more seats)
   const sectionARegex = /^A([1-9]|[1-5][0-9]|6[0-6])$/; // A1-A66
-  const sectionBRegex = /^B([1-9]|[1-2][0-9]|3[0-9])$/; // B1-B39
+  const sectionBRegex = /^B([1-9]|[1-8][0-9]|9[0-9])$/; // B1-B99
   return sectionARegex.test(seatNumber) || sectionBRegex.test(seatNumber);
 }
 
@@ -32,8 +32,8 @@ export async function getAvailableSeats(req, res) {
     }
 
     if (!section || section === "B") {
-      // Get available seats in Section B (B1 to B39)
-      for (let i = 1; i <= 39; i++) {
+      // Get available seats in Section B (B1 to B99)
+      for (let i = 1; i <= 99; i++) {
         const seatNumber = `B${i}`;
         const existingSeat = await User.findOne({seatNumber, isActive: true});
         if (!existingSeat) {
@@ -105,7 +105,7 @@ export async function addSeat(req, res) {
     if (!validateSeatNumber(seatNumber)) {
       return res.status(400).json({
         message:
-          "Invalid seat number. Use format A1-A66 for Section A or B1-B39 for Section B",
+          "Invalid seat number. Use format A1-A66 for Section A or B1-B99 for Section B",
       });
     }
 
@@ -257,7 +257,7 @@ export async function getSeatManagement(req, res) {
     );
 
     // Calculate simple seat statistics (only for valid seats)
-    const totalSeats = 105; // Section A (66) + Section B (39) = 105
+    const totalSeats = 165; // Section A (66) + Section B (99) = 165
     const occupiedSeats = validUsers.filter((user) => user.isActive).length;
     const availableSeats = totalSeats - occupiedSeats;
 
@@ -335,9 +335,9 @@ export async function getSeatManagement(req, res) {
           available: 66 - sectionAOccupied,
         },
         sectionB: {
-          total: 39,
+          total: 99,
           occupied: sectionBOccupied,
-          available: 39 - sectionBOccupied,
+          available: 99 - sectionBOccupied,
         },
       },
       seats: seatData,
