@@ -12,6 +12,40 @@ function getSectionFromSeat(seatNumber) {
   return seatNumber ? seatNumber.charAt(0) : null;
 }
 
+// Initialize default seats for sections
+export async function initializeDefaultSeats(req, res) {
+  try {
+    // Check if Section B already has seats
+    const existingBSeats = await User.find({
+      seatNumber: {$regex: /^B\d+$/},
+    }).countDocuments();
+
+    if (existingBSeats === 0) {
+      // Initialize Section B with 39 default seats (all available)
+      const defaultSeats = [];
+      for (let i = 1; i <= 39; i++) {
+        defaultSeats.push({
+          seatNumber: `B${i}`,
+          name: `Seat B${i}`,
+          isActive: false, // Available by default
+          joiningDate: new Date(),
+        });
+      }
+
+      await User.insertMany(defaultSeats);
+      console.log("Initialized Section B with 39 default seats");
+    }
+
+    res.json({
+      message: "Default seats initialized successfully",
+      sectionBSeats: 39,
+    });
+  } catch (error) {
+    console.error("Error initializing default seats:", error);
+    res.status(500).json({message: "Internal server error"});
+  }
+}
+
 // Get available seat numbers for frontend dropdown
 export async function getAvailableSeats(req, res) {
   try {
@@ -44,16 +78,16 @@ export async function getAvailableSeats(req, res) {
     }
 
     if (!section || section === "B") {
-      // Find max seat number for Section B
+      // Find max seat number for Section B, default to 39 if no seats exist
       const sectionBSeats = allSeats
         .filter((seat) => seat.seatNumber && seat.seatNumber.startsWith("B"))
         .map((seat) => parseInt(seat.seatNumber.substring(1)))
         .filter((num) => !isNaN(num));
 
-      const maxB = sectionBSeats.length > 0 ? Math.max(...sectionBSeats) : 0;
+      const maxB = sectionBSeats.length > 0 ? Math.max(...sectionBSeats) : 39; // Default to 39
 
-      // Get available seats in Section B up to the maximum found
-      for (let i = 1; i <= maxB; i++) {
+      // Get available seats in Section B up to the maximum found (minimum 39)
+      for (let i = 1; i <= Math.max(maxB, 39); i++) {
         const seatNumber = `B${i}`;
         const existingSeat = allSeats.find(
           (seat) => seat.seatNumber === seatNumber && seat.isActive
@@ -137,11 +171,22 @@ export async function addSeat(req, res) {
       });
     }
 
-    // Allow adding a seat placeholder only if no active user occupies it
-    const existingSeatUser = await User.findOne({seatNumber, isActive: true});
+    // Check if any user already has this seat number (active or inactive)
+    const existingSeatUser = await User.findOne({seatNumber});
     if (existingSeatUser) {
       return res.status(400).json({message: "Seat number already exists"});
     }
+
+    // Create a new seat record (inactive/available by default)
+    const newSeat = new User({
+      seatNumber: seatNumber,
+      name: `Seat ${seatNumber}`,
+      isActive: false, // Available by default
+      joiningDate: new Date(),
+      // Other fields will be filled when a student is assigned
+    });
+
+    await newSeat.save();
 
     res.json({
       message: "Seat added successfully!",
@@ -151,7 +196,7 @@ export async function addSeat(req, res) {
       plan: "-",
     });
   } catch (error) {
-    console.error("Error allocating seat:", error);
+    console.error("Error adding seat:", error);
     res.status(500).json({
       message: "Internal server error",
     });
@@ -285,19 +330,26 @@ export async function getSeatManagement(req, res) {
       validateSeatNumber(user.seatNumber)
     );
 
-    // Calculate simple seat statistics (only for valid seats)
-    const totalSeats = 165; // Section A (66) + Section B (99) = 165
+    // Calculate dynamic seat statistics based on actual seats in database
+    const totalSeats = validUsers.length;
     const occupiedSeats = validUsers.filter((user) => user.isActive).length;
     const availableSeats = totalSeats - occupiedSeats;
 
-    // Section-wise statistics (only for valid seats)
-    const sectionAOccupied = validUsers.filter(
-      (user) =>
-        user.seatNumber && user.seatNumber.startsWith("A") && user.isActive
+    // Calculate section-wise dynamic statistics
+    const sectionAUsers = validUsers.filter(
+      (user) => user.seatNumber && user.seatNumber.startsWith("A")
+    );
+    const sectionBUsers = validUsers.filter(
+      (user) => user.seatNumber && user.seatNumber.startsWith("B")
+    );
+
+    const sectionATotal = sectionAUsers.length;
+    const sectionAOccupied = sectionAUsers.filter(
+      (user) => user.isActive
     ).length;
-    const sectionBOccupied = validUsers.filter(
-      (user) =>
-        user.seatNumber && user.seatNumber.startsWith("B") && user.isActive
+    const sectionBTotal = sectionBUsers.length;
+    const sectionBOccupied = sectionBUsers.filter(
+      (user) => user.isActive
     ).length;
 
     // Prepare seat data for frontend (only valid seats)
@@ -332,7 +384,7 @@ export async function getSeatManagement(req, res) {
       return {
         seatNumber: user.seatNumber,
         section: getSectionFromSeat(user.seatNumber),
-        student: user.name || "Available",
+        studentName: user.name || "Available",
         plan: user.subscriptionPlan ? user.subscriptionPlan.planName : "-",
         joiningDate: user.joiningDate
           ? user.joiningDate.toISOString().split("T")[0]
@@ -371,14 +423,14 @@ export async function getSeatManagement(req, res) {
         occupiedSeats,
         availableSeats,
         sectionA: {
-          total: 66,
+          total: sectionATotal,
           occupied: sectionAOccupied,
-          available: 66 - sectionAOccupied,
+          available: sectionATotal - sectionAOccupied,
         },
         sectionB: {
-          total: 99,
+          total: sectionBTotal,
           occupied: sectionBOccupied,
-          available: 99 - sectionBOccupied,
+          available: sectionBTotal - sectionBOccupied,
         },
       },
       seats: seatData,
