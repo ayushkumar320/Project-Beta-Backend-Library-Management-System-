@@ -566,7 +566,7 @@ export async function getSeatManagement(req, res) {
     // Calculate occupied seats (count unique base seat numbers, not individual students)
     const getBaseSeatNumber = (seatNumber) => {
       // Extract base seat number (remove _2, _3, etc. suffixes)
-      return seatNumber.split('_')[0];
+      return seatNumber.split("_")[0];
     };
 
     // Get unique base seat numbers for each section
@@ -614,14 +614,11 @@ export async function getSeatManagement(req, res) {
 
     // Group users by base seat number and prepare seat data
     const seatMap = new Map();
-    const getBaseSeatNumber = (seatNumber) => {
-      return seatNumber.split('_')[0];
-    };
 
     // Group students by their base seat number
     validUsers.forEach((user) => {
       const baseSeatNumber = getBaseSeatNumber(user.seatNumber);
-      
+
       if (!seatMap.has(baseSeatNumber)) {
         seatMap.set(baseSeatNumber, {
           seatNumber: baseSeatNumber,
@@ -633,7 +630,7 @@ export async function getSeatManagement(req, res) {
       }
 
       const seatInfo = seatMap.get(baseSeatNumber);
-      
+
       // If this user is active and has a name, add them to the seat
       if (user.isActive && user.name && user.name.trim() !== "") {
         let expirationDate = null;
@@ -687,10 +684,10 @@ export async function getSeatManagement(req, res) {
     });
 
     // Convert map to array and add additional seat properties
-    const seatData = Array.from(seatMap.values()).map(seat => {
+    const seatData = Array.from(seatMap.values()).map((seat) => {
       // Set primary student name for display (first student or "Available")
       const primaryStudent = seat.students.length > 0 ? seat.students[0] : null;
-      
+
       return {
         ...seat,
         studentName: primaryStudent ? primaryStudent.name : "Available",
