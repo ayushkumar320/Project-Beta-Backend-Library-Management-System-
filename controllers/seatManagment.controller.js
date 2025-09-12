@@ -15,6 +15,27 @@ function getSectionFromSeat(seatNumber) {
 // Initialize default seats for sections
 export async function initializeDefaultSeats(req, res) {
   try {
+    // Check if Section A already has seats
+    const existingASeats = await User.find({
+      seatNumber: {$regex: /^A\d+$/},
+    }).countDocuments();
+
+    if (existingASeats === 0) {
+      // Initialize Section A with 66 default seats (all available)
+      const defaultSeatsA = [];
+      for (let i = 1; i <= 66; i++) {
+        defaultSeatsA.push({
+          seatNumber: `A${i}`,
+          isActive: false, // Available by default
+          joiningDate: new Date(),
+          // Don't set name for empty seats - will show as "Available"
+        });
+      }
+
+      await User.insertMany(defaultSeatsA);
+      console.log("Initialized Section A with 66 default seats");
+    }
+
     // Check if Section B already has seats
     const existingBSeats = await User.find({
       seatNumber: {$regex: /^B\d+$/},
@@ -22,9 +43,9 @@ export async function initializeDefaultSeats(req, res) {
 
     if (existingBSeats === 0) {
       // Initialize Section B with 39 default seats (all available)
-      const defaultSeats = [];
+      const defaultSeatsB = [];
       for (let i = 1; i <= 39; i++) {
-        defaultSeats.push({
+        defaultSeatsB.push({
           seatNumber: `B${i}`,
           isActive: false, // Available by default
           joiningDate: new Date(),
@@ -32,12 +53,13 @@ export async function initializeDefaultSeats(req, res) {
         });
       }
 
-      await User.insertMany(defaultSeats);
+      await User.insertMany(defaultSeatsB);
       console.log("Initialized Section B with 39 default seats");
     }
 
     res.json({
       message: "Default seats initialized successfully",
+      sectionASeats: 66,
       sectionBSeats: 39,
     });
   } catch (error) {
@@ -57,16 +79,16 @@ export async function getAvailableSeats(req, res) {
     const allSeats = await User.find({}, "seatNumber isActive");
 
     if (!section || section === "A") {
-      // Find max seat number for Section A
+      // Find max seat number for Section A, default to 66 if no seats exist
       const sectionASeats = allSeats
         .filter((seat) => seat.seatNumber && seat.seatNumber.startsWith("A"))
         .map((seat) => parseInt(seat.seatNumber.substring(1)))
         .filter((num) => !isNaN(num));
 
-      const maxA = sectionASeats.length > 0 ? Math.max(...sectionASeats) : 0;
+      const maxA = sectionASeats.length > 0 ? Math.max(...sectionASeats) : 66; // Default to 66
 
-      // Get available seats in Section A up to the maximum found
-      for (let i = 1; i <= maxA; i++) {
+      // Get available seats in Section A up to the maximum found (minimum 66)
+      for (let i = 1; i <= Math.max(maxA, 66); i++) {
         const seatNumber = `A${i}`;
         const existingSeat = allSeats.find(
           (seat) => seat.seatNumber === seatNumber && seat.isActive
