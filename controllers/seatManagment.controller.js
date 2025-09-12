@@ -164,9 +164,7 @@ export async function getSeatInfo(req, res) {
       feePaid: user.feePaid,
       slot: user.slot,
       fatherName: user.fatherName,
-      dateOfBirth: user.dateOfBirth,
       adharNumber: user.adharNumber,
-      idNumber: user.idNumber,
       isActive: user.isActive,
     }));
 
@@ -694,9 +692,6 @@ export async function getSeatManagement(req, res) {
           feePaid: user.feePaid,
           slot: user.slot,
           fatherName: user.fatherName,
-          dateOfBirth: user.dateOfBirth
-            ? user.dateOfBirth.toISOString().split("T")[0]
-            : null,
         });
 
         // Update seat status
