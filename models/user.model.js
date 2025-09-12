@@ -54,8 +54,8 @@ const UserSchema = new mongoose.Schema({
   },
   idNumber: {
     type: Number,
-    required: true,
     unique: true,
+    sparse: true, // Allows multiple null values
   },
   isActive: {
     type: Boolean,

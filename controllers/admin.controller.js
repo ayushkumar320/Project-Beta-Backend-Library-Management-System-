@@ -54,12 +54,10 @@ export async function registerUser(req, res) {
     joiningDate,
     feePaid,
     seatNumber,
-    dateOfBirth,
     fatherName,
     address,
     examPreparingFor,
     schoolOrCollegeName,
-    idNumber,
     isActive,
     lockerService,
   } = req.body;
@@ -68,27 +66,20 @@ export async function registerUser(req, res) {
     await connectDB();
 
     // Input validation for required fields
-    if (
-      !name ||
-      !adharNumber ||
-      !subscriptionPlan ||
-      !seatNumber ||
-      !idNumber
-    ) {
+    if (!name || !adharNumber || !subscriptionPlan || !seatNumber) {
       return res.status(400).json({
         message:
-          "Missing required fields: name, adharNumber, subscriptionPlan, seatNumber, and idNumber are required",
+          "Missing required fields: name, adharNumber, subscriptionPlan, and seatNumber are required",
       });
     }
 
     // Convert string numbers to actual numbers
     const adharNumberAsNumber = parseInt(adharNumber);
-    const idNumberAsNumber = parseInt(idNumber);
 
     // Validate number conversions
-    if (isNaN(adharNumberAsNumber) || isNaN(idNumberAsNumber)) {
+    if (isNaN(adharNumberAsNumber)) {
       return res.status(400).json({
-        message: "adharNumber and idNumber must be valid numbers",
+        message: "adharNumber must be a valid number",
       });
     }
 
@@ -107,21 +98,15 @@ export async function registerUser(req, res) {
       });
     }
 
-    // Check for duplicate Aadhar and ID numbers (but allow multiple students per seat)
+    // Check for duplicate Aadhar numbers (but allow multiple students per seat)
     const existingUser = await User.findOne({
-      $or: [{adharNumber: adharNumberAsNumber}, {idNumber: idNumberAsNumber}],
+      adharNumber: adharNumberAsNumber,
     });
 
     if (existingUser) {
-      if (existingUser.adharNumber === adharNumberAsNumber) {
-        return res
-          .status(400)
-          .json({message: "User with this Aadhar number already exists"});
-      } else if (existingUser.idNumber === idNumberAsNumber) {
-        return res
-          .status(400)
-          .json({message: "User with this ID number already exists"});
-      }
+      return res
+        .status(400)
+        .json({message: "User with this Aadhar number already exists"});
     }
 
     // Check how many students are already in this seat
@@ -142,7 +127,6 @@ export async function registerUser(req, res) {
       adharNumber: adharNumberAsNumber,
       subscriptionPlan,
       seatNumber: seatIdentifier, // Use the unique seat identifier
-      idNumber: idNumberAsNumber,
     };
 
     // Add optional fields only if provided
@@ -151,9 +135,6 @@ export async function registerUser(req, res) {
     }
     if (feePaid !== undefined) {
       userData.feePaid = Boolean(feePaid);
-    }
-    if (dateOfBirth) {
-      userData.dateOfBirth = new Date(dateOfBirth);
     }
     if (fatherName) {
       userData.fatherName = fatherName;
