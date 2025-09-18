@@ -399,6 +399,7 @@ export async function getSubscriptionPlans(req, res) {
   }
 }
 
+
 export async function getUsers(req, res) {
   try {
     // Ensure database connection
