@@ -8,7 +8,6 @@ import connectDB from "./db/connectDB.js";
 dotenv.config();
 
 connectDB();
-
 const app = express();
 
 // Middleware
