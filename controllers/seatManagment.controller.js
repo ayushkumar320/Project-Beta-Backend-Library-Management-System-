@@ -195,13 +195,37 @@ export async function addSeat(req, res) {
       });
     }
 
-    // Check if any user already has this seat number (active or inactive)
+    // Check if any user already has this seat number
     const existingSeatUser = await User.findOne({seatNumber});
+
     if (existingSeatUser) {
-      return res.status(400).json({message: "Seat number already exists"});
+      // If seat exists and is occupied (has active student), prevent adding
+      if (
+        existingSeatUser.isActive &&
+        existingSeatUser.name &&
+        existingSeatUser.name.trim() !== ""
+      ) {
+        return res.status(400).json({
+          message: `Seat ${seatNumber} is already occupied by ${existingSeatUser.name}`,
+          occupied: true,
+          studentName: existingSeatUser.name,
+        });
+      } else {
+        // Seat exists but is available - just return success
+        return res.json({
+          message: `Seat ${seatNumber} is already available!`,
+          seatNumber: seatNumber,
+          section: getSectionFromSeat(seatNumber),
+          student: "Available",
+          plan: "-",
+          status: "Available",
+          feePaid: false,
+          alreadyExists: true,
+        });
+      }
     }
 
-    // Create a new seat record (inactive/available by default)
+    // Create a new seat record (inactive/available by default) - only for seats that don't exist at all
     const newSeat = new User({
       seatNumber: seatNumber,
       isActive: false, // Available by default
