@@ -619,10 +619,40 @@ export async function getSeatManagement(req, res) {
       `Found ${validUsers.length} valid user records with proper seat numbers`
     );
 
-    // Calculate actual seat totals based on layout (not just database records)
-    const sectionATotal = 66; // Section A has 66 seats (1-66)
-    const sectionBTotal = 39; // Section B has 39 seats (1-39)
-    const totalSeats = sectionATotal + sectionBTotal; // 105 total seats
+    // Calculate dynamic seat totals based on what actually exists in database
+    // Find the highest seat numbers for each section
+    let sectionATotal = 66; // Default minimum
+    let sectionBTotal = 39; // Default minimum
+
+    // Check database for highest seat numbers to support expandable seating
+    const sectionASeats = validUsers.filter((user) =>
+      user.seatNumber.startsWith("A")
+    );
+    const sectionBSeats = validUsers.filter((user) =>
+      user.seatNumber.startsWith("B")
+    );
+
+    if (sectionASeats.length > 0) {
+      const maxASeat = Math.max(
+        ...sectionASeats.map((user) => {
+          const match = user.seatNumber.match(/^A(\d+)/);
+          return match ? parseInt(match[1]) : 0;
+        })
+      );
+      sectionATotal = Math.max(sectionATotal, maxASeat);
+    }
+
+    if (sectionBSeats.length > 0) {
+      const maxBSeat = Math.max(
+        ...sectionBSeats.map((user) => {
+          const match = user.seatNumber.match(/^B(\d+)/);
+          return match ? parseInt(match[1]) : 0;
+        })
+      );
+      sectionBTotal = Math.max(sectionBTotal, maxBSeat);
+    }
+
+    const totalSeats = sectionATotal + sectionBTotal;
 
     // Calculate occupied seats (count unique base seat numbers, not individual students)
     const getBaseSeatNumber = (seatNumber) => {
