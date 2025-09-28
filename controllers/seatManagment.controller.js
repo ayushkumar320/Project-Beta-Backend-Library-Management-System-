@@ -279,11 +279,19 @@ export async function deleteSeat(req, res) {
       });
     }
 
-    // If seat exists but is not active, we can consider it deleted
-    // (In a real scenario, you might want to actually remove the user record)
+    // Actually delete the seat record from the database
+    const deletedSeat = await User.deleteOne({seatNumber});
+
+    if (deletedSeat.deletedCount === 0) {
+      return res.status(404).json({
+        message: `Seat ${seatNumber} not found in database`,
+      });
+    }
+
     res.json({
       message: "Seat deleted successfully!",
       seatNumber: seatNumber,
+      deletedCount: deletedSeat.deletedCount,
     });
   } catch (error) {
     console.error("Error deleting seat:", error);
@@ -761,20 +769,23 @@ export async function getSeatManagement(req, res) {
       availableSeats
     );
 
-    // Generate complete seat data for ALL seats (both occupied and empty)
+    // Generate seat data based on ACTUAL database records, not assumed ranges
     const seatData = [];
 
-    // Generate Section A seats (A1-A66)
-    for (let i = 1; i <= sectionATotal; i++) {
-      const seatNumber = `A${i}`;
-      const occupiedInfo = occupiedSeats.get(seatNumber);
+    // Create sets of all existing seat numbers from database
+    const existingSeats = new Set(validUsers.map((user) => user.seatNumber));
+
+    // Add all database records to seatData
+    validUsers.forEach((user) => {
+      const baseSeatNumber = getBaseSeatNumber(user.seatNumber);
+      const occupiedInfo = occupiedSeats.get(baseSeatNumber);
 
       if (occupiedInfo) {
         // Occupied seat
         const primaryStudent = occupiedInfo.students[0];
         seatData.push({
-          seatNumber,
-          section: "A",
+          seatNumber: baseSeatNumber,
+          section: getSectionFromSeat(baseSeatNumber),
           students: occupiedInfo.students,
           status: "Occupied",
           feePaid: occupiedInfo.feePaid,
@@ -785,10 +796,10 @@ export async function getSeatManagement(req, res) {
           studentCount: occupiedInfo.students.length,
         });
       } else {
-        // Available seat
+        // Available seat (exists in DB but not occupied)
         seatData.push({
-          seatNumber,
-          section: "A",
+          seatNumber: baseSeatNumber,
+          section: getSectionFromSeat(baseSeatNumber),
           students: [],
           status: "Available",
           feePaid: false,
@@ -799,80 +810,66 @@ export async function getSeatManagement(req, res) {
           studentCount: 0,
         });
       }
-    }
+    });
 
-    // Generate Section B seats (B1-B39)
-    for (let i = 1; i <= sectionBTotal; i++) {
-      const seatNumber = `B${i}`;
-      const occupiedInfo = occupiedSeats.get(seatNumber);
-
-      if (occupiedInfo) {
-        // Occupied seat
-        const primaryStudent = occupiedInfo.students[0];
-        seatData.push({
-          seatNumber,
-          section: "B",
-          students: occupiedInfo.students,
-          status: "Occupied",
-          feePaid: occupiedInfo.feePaid,
-          studentName: primaryStudent.name,
-          plan: primaryStudent.plan || "-",
-          joiningDate: primaryStudent.joiningDate || "-",
-          expirationDate: primaryStudent.expiryDate || "-",
-          studentCount: occupiedInfo.students.length,
-        });
-      } else {
-        // Available seat
-        seatData.push({
-          seatNumber,
-          section: "B",
-          students: [],
-          status: "Available",
-          feePaid: false,
-          studentName: "Available",
-          plan: "-",
-          joiningDate: "-",
-          expirationDate: "-",
-          studentCount: 0,
-        });
+    // Remove duplicates (in case of multiple students per seat)
+    const uniqueSeats = new Map();
+    seatData.forEach((seat) => {
+      if (!uniqueSeats.has(seat.seatNumber)) {
+        uniqueSeats.set(seat.seatNumber, seat);
       }
-    }
+    });
 
-    // Sort seats by section and number
-    seatData.sort((a, b) => {
-      if (a.section !== b.section) {
-        return a.section.localeCompare(b.section);
+    const finalSeatData = Array.from(uniqueSeats.values());
+
+    // Sort seats properly (A1, A2... A10, A11... then B1, B2... etc.)
+    finalSeatData.sort((a, b) => {
+      const aSection = a.seatNumber.charAt(0);
+      const bSection = b.seatNumber.charAt(0);
+
+      if (aSection !== bSection) {
+        return aSection.localeCompare(bSection);
       }
-      const aNum = parseInt(a.seatNumber.substring(1));
-      const bNum = parseInt(b.seatNumber.substring(1));
+
+      const aNum = parseInt(a.seatNumber.slice(1));
+      const bNum = parseInt(b.seatNumber.slice(1));
       return aNum - bNum;
     });
 
+    // Update totals based on actual seat data
+    const actualSectionASeats = finalSeatData.filter(
+      (seat) => seat.section === "A"
+    ).length;
+    const actualSectionBSeats = finalSeatData.filter(
+      (seat) => seat.section === "B"
+    ).length;
+    const actualTotalSeats = actualSectionASeats + actualSectionBSeats;
+
     console.log(
-      `Generated ${seatData.length} total seats (${sectionATotal} Section A + ${sectionBTotal} Section B)`
+      `Generated ${finalSeatData.length} total seats (${actualSectionASeats} Section A + ${actualSectionBSeats} Section B)`
     );
 
-    // Prepare response
+    // Prepare response with actual seat data
     const response = {
-      totalSeats,
+      totalSeats: actualTotalSeats,
       occupiedSeats: totalOccupied,
-      availableSeats,
+      availableSeats: actualTotalSeats - totalOccupied,
       statistics: {
-        totalSeats,
+        totalSeats: actualTotalSeats,
         occupiedSeats: totalOccupied,
-        availableSeats,
+        availableSeats: actualTotalSeats - totalOccupied,
         sectionA: {
-          total: sectionATotal,
+          total: actualSectionASeats,
           occupied: sectionAOccupied,
-          available: sectionATotal - sectionAOccupied,
+          available: actualSectionASeats - sectionAOccupied,
         },
         sectionB: {
-          total: sectionBTotal,
+          total: actualSectionBSeats,
           occupied: sectionBOccupied,
-          available: sectionBTotal - sectionBOccupied,
+          available: actualSectionBSeats - sectionBOccupied,
         },
       },
-      seats: seatData,
+      seats: finalSeatData,
       invalidSeats: users
         .filter((user) => !validateSeatNumber(user.seatNumber))
         .map((user) => ({
