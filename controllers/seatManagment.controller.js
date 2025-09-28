@@ -33,7 +33,6 @@ export async function initializeDefaultSeats(req, res) {
       }
 
       await User.insertMany(defaultSeatsA);
-      console.log("Initialized Section A with 66 default seats");
     }
 
     // Check if Section B already has seats
@@ -54,7 +53,6 @@ export async function initializeDefaultSeats(req, res) {
       }
 
       await User.insertMany(defaultSeatsB);
-      console.log("Initialized Section B with 39 default seats");
     }
 
     res.json({
@@ -246,7 +244,6 @@ export async function addSeat(req, res) {
       feePaid: false,
     });
   } catch (error) {
-    console.error("Error adding seat:", error);
     if (error.code === 11000) {
       return res.status(400).json({
         message: "Seat number already exists",
@@ -294,7 +291,6 @@ export async function deleteSeat(req, res) {
       deletedCount: deletedSeat.deletedCount,
     });
   } catch (error) {
-    console.error("Error deleting seat:", error);
     res.status(500).json({
       message: "Internal server error",
     });
@@ -616,15 +612,8 @@ export async function getSeatManagement(req, res) {
       .sort({seatNumber: 1})
       .exec();
 
-    console.log(`Found ${users.length} total user records in database`);
-
-    // Filter out users with invalid seat numbers (for data consistency)
     const validUsers = users.filter((user) =>
       validateSeatNumber(user.seatNumber)
-    );
-
-    console.log(
-      `Found ${validUsers.length} valid user records with proper seat numbers`
     );
 
     // Calculate dynamic seat totals based on what actually exists in database
@@ -745,29 +734,6 @@ export async function getSeatManagement(req, res) {
     const sectionBOccupied = sectionBOccupiedSet.size;
     const totalOccupied = sectionAOccupied + sectionBOccupied;
     const availableSeats = totalSeats - totalOccupied;
-
-    // Debug logging
-    console.log("Seat statistics debug:");
-    console.log(
-      "Section A - Total:",
-      sectionATotal,
-      "Occupied:",
-      sectionAOccupied
-    );
-    console.log(
-      "Section B - Total:",
-      sectionBTotal,
-      "Occupied:",
-      sectionBOccupied
-    );
-    console.log(
-      "Overall - Total:",
-      totalSeats,
-      "Occupied:",
-      totalOccupied,
-      "Available:",
-      availableSeats
-    );
 
     // Generate seat data based on ACTUAL database records PLUS minimum base seats
     const seatData = [];
@@ -903,25 +869,7 @@ export async function getSeatManagement(req, res) {
     const actualSectionBSeats = finalSeatData.filter(
       (seat) => seat.section === "B"
     ).length;
-    const actualTotalSeats = actualSectionASeats + actualSectionBSeats;
-
-    console.log(
-      `Generated ${finalSeatData.length} total seats (${actualSectionASeats} Section A + ${actualSectionBSeats} Section B)`
-    );
-
-    // Debug: Log the actual counts
-    console.log("Count Debug:");
-    console.log("Final seat data length:", finalSeatData.length);
-    console.log("Occupied seats count:", totalOccupied);
-    console.log("Available calculation:", actualTotalSeats - totalOccupied);
-    console.log("Section A seats:", actualSectionASeats);
-    console.log("Section B seats:", actualSectionBSeats);
-    console.log(
-      "Sample seats:",
-      finalSeatData.slice(0, 5).map((s) => s.seatNumber)
-    );
-
-    // Prepare response with actual seat data
+    const actualTotalSeats = actualSectionASeats + actualSectionBSeats; // Prepare response with actual seat data
     const response = {
       totalSeats: actualTotalSeats,
       occupiedSeats: totalOccupied,
