@@ -654,7 +654,7 @@ export async function getSeatManagement(req, res) {
     // Group users by base seat number and prepare seat data
     const seatMap = new Map();
 
-    // Group students by their base seat number
+    // Group ALL users by their base seat number (including empty seats)
     validUsers.forEach((user) => {
       const baseSeatNumber = getBaseSeatNumber(user.seatNumber);
 
@@ -670,7 +670,7 @@ export async function getSeatManagement(req, res) {
 
       const seatInfo = seatMap.get(baseSeatNumber);
 
-      // If this user is active and has a name, add them to the seat
+      // Add user to seat if they are active and have a name
       if (user.isActive && user.name && user.name.trim() !== "") {
         let expirationDate = null;
 
@@ -720,7 +720,7 @@ export async function getSeatManagement(req, res) {
     });
 
     // Convert map to array and add additional seat properties
-    const seatData = Array.from(seatMap.values()).map((seat) => {
+    let seatData = Array.from(seatMap.values()).map((seat) => {
       // Set primary student name for display (first student or "Available")
       const primaryStudent = seat.students.length > 0 ? seat.students[0] : null;
 
@@ -767,40 +767,125 @@ export async function getSeatManagement(req, res) {
   }
 }
 
-// Function to clean up invalid seat numbers (admin use)
+// Function to clean up invalid seat numbers and orphaned records (admin use)
 export async function cleanupInvalidSeats(req, res) {
   try {
-    // Find all users with invalid seat numbers
+    const {action = "check"} = req.query; // 'check' or 'cleanup'
+
+    // Find all users
     const allUsers = await User.find();
+    console.log(`Found ${allUsers.length} total user records`);
+
+    // Find users with invalid seat numbers
     const invalidUsers = allUsers.filter(
       (user) => !validateSeatNumber(user.seatNumber)
     );
 
-    if (invalidUsers.length === 0) {
+    // Find duplicate seat numbers (excluding multi-student seats with _2, _3 suffixes)
+    const seatNumbers = new Map();
+    const duplicateUsers = [];
+
+    allUsers.forEach((user) => {
+      const baseSeat = user.seatNumber.split("_")[0];
+      if (seatNumbers.has(baseSeat)) {
+        // Only flag as duplicate if both records have the same suffix or both have no suffix
+        const existing = seatNumbers.get(baseSeat);
+        if (user.seatNumber === existing.seatNumber) {
+          duplicateUsers.push(user);
+        }
+      } else {
+        seatNumbers.set(baseSeat, user);
+      }
+    });
+
+    // Find orphaned empty seats (seats with no name and not active)
+    const orphanedEmptySeats = allUsers.filter(
+      (user) =>
+        !user.name &&
+        !user.isActive &&
+        user.seatNumber &&
+        validateSeatNumber(user.seatNumber)
+    );
+
+    const problemRecords = {
+      invalid: invalidUsers,
+      duplicates: duplicateUsers,
+      orphanedEmpty: orphanedEmptySeats,
+    };
+
+    if (action === "cleanup") {
+      let cleanedCount = 0;
+
+      // Remove invalid seats
+      if (invalidUsers.length > 0) {
+        await User.deleteMany({
+          _id: {$in: invalidUsers.map((u) => u._id)},
+        });
+        cleanedCount += invalidUsers.length;
+        console.log(`Removed ${invalidUsers.length} invalid seat records`);
+      }
+
+      // Remove exact duplicates (keep the first one)
+      if (duplicateUsers.length > 0) {
+        await User.deleteMany({
+          _id: {$in: duplicateUsers.map((u) => u._id)},
+        });
+        cleanedCount += duplicateUsers.length;
+        console.log(`Removed ${duplicateUsers.length} duplicate seat records`);
+      }
+
       return res.json({
-        message: "No invalid seats found",
-        cleanedSeats: [],
+        message: `Database cleanup completed - removed ${cleanedCount} problematic records`,
+        cleaned: {
+          invalidSeats: invalidUsers.length,
+          duplicates: duplicateUsers.length,
+          orphanedEmpty: orphanedEmptySeats.length,
+        },
+        suggestion:
+          "Please refresh the seat management page to see updated data",
       });
     }
 
-    // You can either delete these users or update their seat numbers
-    // For safety, let's just return the list for manual review
-    const invalidSeatData = invalidUsers.map((user) => ({
-      _id: user._id,
-      seatNumber: user.seatNumber,
-      studentName: user.name,
-      isActive: user.isActive,
-      reason: "Invalid seat number format - should be A1-A66 or B1-B39",
-    }));
+    // Check mode - just return the problems found
+    const totalProblems = invalidUsers.length + duplicateUsers.length;
+
+    if (totalProblems === 0) {
+      return res.json({
+        message: "Database is clean - no problematic seat records found",
+        stats: {
+          totalRecords: allUsers.length,
+          orphanedEmptySeats: orphanedEmptySeats.length,
+        },
+      });
+    }
 
     res.json({
-      message: `Found ${invalidUsers.length} invalid seat(s)`,
-      invalidSeats: invalidSeatData,
+      message: `Found ${totalProblems} problematic seat record(s)`,
+      problems: {
+        invalidSeats: invalidUsers.map((user) => ({
+          _id: user._id,
+          seatNumber: user.seatNumber,
+          studentName: user.name || "Empty",
+          reason: "Invalid seat number format",
+        })),
+        duplicates: duplicateUsers.map((user) => ({
+          _id: user._id,
+          seatNumber: user.seatNumber,
+          studentName: user.name || "Empty",
+          reason: "Duplicate seat number",
+        })),
+      },
+      stats: {
+        totalRecords: allUsers.length,
+        orphanedEmptySeats: orphanedEmptySeats.length,
+      },
       suggestion:
-        "Please update these seat numbers to valid format (A1-A66 or B1-B39) or delete if they are test data",
+        "Call this endpoint with ?action=cleanup to remove problematic records",
     });
   } catch (error) {
-    console.error("Error cleaning up invalid seats:", error);
-    res.status(500).json({message: "Internal server error"});
+    console.error("Error in seat cleanup:", error);
+    res
+      .status(500)
+      .json({message: "Internal server error", error: error.message});
   }
 }
