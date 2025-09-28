@@ -206,7 +206,8 @@ export async function addSeat(req, res) {
       seatNumber: seatNumber,
       isActive: false, // Available by default
       joiningDate: new Date(),
-      // Don't set name for empty seats - will show as "Available"
+      feePaid: false,
+      // Don't set name, adharNumber, or subscriptionPlan for empty seats
     });
 
     await newSeat.save();
@@ -217,11 +218,19 @@ export async function addSeat(req, res) {
       section: getSectionFromSeat(seatNumber),
       student: "Available",
       plan: "-",
+      status: "Available",
+      feePaid: false,
     });
   } catch (error) {
     console.error("Error adding seat:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Seat number already exists",
+      });
+    }
     res.status(500).json({
       message: "Internal server error",
+      error: error.message,
     });
   }
 }
@@ -411,6 +420,16 @@ export async function updateSeat(req, res) {
     const seatNumber = req.params.seatNumber;
     const {studentName, planName, isActive, feePaid, adharNumber, slot} =
       req.body;
+
+    console.log("UpdateSeat called with:", {
+      seatNumber,
+      studentName,
+      planName,
+      isActive,
+      feePaid,
+      adharNumber,
+      slot,
+    });
 
     if (studentName && planName && adharNumber) {
       // Adding/updating a student - check if student already exists anywhere

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const UserSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true,
+    required: false, // Allow empty seats without student names
   },
   // Morning | Evening | Full day | 24 Hour
   slot: {
@@ -12,14 +12,15 @@ const UserSchema = new mongoose.Schema({
   },
   adharNumber: {
     type: Number,
-    required: true,
+    required: false, // Allow empty seats without adhar numbers
     unique: true,
+    sparse: true, // Allows multiple null values
   },
   // change the schema to get direct subscription Plan
   subscriptionPlan: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "SubscriptionPlan",
-    required: true,
+    required: false, // Allow empty seats without subscription plans
   },
   joiningDate: {
     type: Date,
