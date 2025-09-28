@@ -769,23 +769,46 @@ export async function getSeatManagement(req, res) {
       availableSeats
     );
 
-    // Generate seat data based on ACTUAL database records, not assumed ranges
+    // Generate seat data based on ACTUAL database records PLUS minimum base seats
     const seatData = [];
 
     // Create sets of all existing seat numbers from database
     const existingSeats = new Set(validUsers.map((user) => user.seatNumber));
 
-    // Add all database records to seatData
-    validUsers.forEach((user) => {
-      const baseSeatNumber = getBaseSeatNumber(user.seatNumber);
-      const occupiedInfo = occupiedSeats.get(baseSeatNumber);
+    // Calculate minimum base seats and actual max seats
+    const minSectionASeats = 66; // Minimum base for Section A
+    const minSectionBSeats = 39; // Minimum base for Section B
+
+    // Get actual maximum seat numbers from database
+    let actualMaxA = minSectionASeats;
+    let actualMaxB = minSectionBSeats;
+
+    sectionASeats.forEach((user) => {
+      const match = user.seatNumber.match(/^A(\d+)/);
+      if (match) {
+        actualMaxA = Math.max(actualMaxA, parseInt(match[1]));
+      }
+    });
+
+    sectionBSeats.forEach((user) => {
+      const match = user.seatNumber.match(/^B(\d+)/);
+      if (match) {
+        actualMaxB = Math.max(actualMaxB, parseInt(match[1]));
+      }
+    });
+
+    // Generate complete seat grids (minimum base + any expanded seats)
+    // Section A seats
+    for (let i = 1; i <= actualMaxA; i++) {
+      const seatNumber = `A${i}`;
+      const occupiedInfo = occupiedSeats.get(seatNumber);
 
       if (occupiedInfo) {
         // Occupied seat
         const primaryStudent = occupiedInfo.students[0];
         seatData.push({
-          seatNumber: baseSeatNumber,
-          section: getSectionFromSeat(baseSeatNumber),
+          seatNumber,
+          section: "A",
           students: occupiedInfo.students,
           status: "Occupied",
           feePaid: occupiedInfo.feePaid,
@@ -796,10 +819,10 @@ export async function getSeatManagement(req, res) {
           studentCount: occupiedInfo.students.length,
         });
       } else {
-        // Available seat (exists in DB but not occupied)
+        // Available seat (show as available whether it exists in DB or not)
         seatData.push({
-          seatNumber: baseSeatNumber,
-          section: getSectionFromSeat(baseSeatNumber),
+          seatNumber,
+          section: "A",
           students: [],
           status: "Available",
           feePaid: false,
@@ -810,7 +833,44 @@ export async function getSeatManagement(req, res) {
           studentCount: 0,
         });
       }
-    });
+    }
+
+    // Section B seats
+    for (let i = 1; i <= actualMaxB; i++) {
+      const seatNumber = `B${i}`;
+      const occupiedInfo = occupiedSeats.get(seatNumber);
+
+      if (occupiedInfo) {
+        // Occupied seat
+        const primaryStudent = occupiedInfo.students[0];
+        seatData.push({
+          seatNumber,
+          section: "B",
+          students: occupiedInfo.students,
+          status: "Occupied",
+          feePaid: occupiedInfo.feePaid,
+          studentName: primaryStudent.name,
+          plan: primaryStudent.plan || "-",
+          joiningDate: primaryStudent.joiningDate || "-",
+          expirationDate: primaryStudent.expiryDate || "-",
+          studentCount: occupiedInfo.students.length,
+        });
+      } else {
+        // Available seat (show as available whether it exists in DB or not)
+        seatData.push({
+          seatNumber,
+          section: "B",
+          students: [],
+          status: "Available",
+          feePaid: false,
+          studentName: "Available",
+          plan: "-",
+          joiningDate: "-",
+          expirationDate: "-",
+          studentCount: 0,
+        });
+      }
+    }
 
     // Remove duplicates (in case of multiple students per seat)
     const uniqueSeats = new Map();
@@ -847,6 +907,18 @@ export async function getSeatManagement(req, res) {
 
     console.log(
       `Generated ${finalSeatData.length} total seats (${actualSectionASeats} Section A + ${actualSectionBSeats} Section B)`
+    );
+
+    // Debug: Log the actual counts
+    console.log("Count Debug:");
+    console.log("Final seat data length:", finalSeatData.length);
+    console.log("Occupied seats count:", totalOccupied);
+    console.log("Available calculation:", actualTotalSeats - totalOccupied);
+    console.log("Section A seats:", actualSectionASeats);
+    console.log("Section B seats:", actualSectionBSeats);
+    console.log(
+      "Sample seats:",
+      finalSeatData.slice(0, 5).map((s) => s.seatNumber)
     );
 
     // Prepare response with actual seat data
