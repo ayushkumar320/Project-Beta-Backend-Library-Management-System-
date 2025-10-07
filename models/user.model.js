@@ -36,7 +36,7 @@ const UserSchema = new mongoose.Schema({
   seatNumber: {
     type: String,
     required: true,
-    unique: true,
+    // Removed unique constraint to allow multiple students per seat
   },
   dateOfBirth: {
     type: Date,
@@ -55,8 +55,7 @@ const UserSchema = new mongoose.Schema({
   },
   idNumber: {
     type: Number,
-    unique: true,
-    sparse: true, // Allows multiple null values
+    // Removed unique constraint to avoid null value conflicts
   },
   isActive: {
     type: Boolean,
